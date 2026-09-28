@@ -29,8 +29,23 @@ if (-not $pythonCmd) {
 
 Write-Host "Found $($pythonCmd): $((& $pythonCmd --version 2>&1))" -ForegroundColor Gray
 
-# Clone or update repository
-if (Test-Path $INSTALL_DIR) {
+# Install from a local checkout when run as a file (.\install.ps1).
+# Under `irm ... | iex` there is no script path, so download with git instead.
+$scriptPath = if ($PSCommandPath) { Split-Path -Parent $PSCommandPath } else { $null }
+$isLocal = $scriptPath -and (Test-Path "$scriptPath\opsh.py") -and ($scriptPath -ne $INSTALL_DIR)
+
+if ($isLocal) {
+    # Local installation (development mode) - always copy the current source files
+    Write-Host "Installing from local directory..." -ForegroundColor Gray
+    New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
+    Copy-Item "$scriptPath\opsh.py" "$INSTALL_DIR\" -Force
+    Copy-Item "$scriptPath\requirements.txt" "$INSTALL_DIR\" -Force
+    # Don't replace API keys that an existing install already has
+    if ((Test-Path "$scriptPath\.env") -and -not (Test-Path "$INSTALL_DIR\.env")) {
+        Copy-Item "$scriptPath\.env" "$INSTALL_DIR\" -Force
+    }
+}
+elseif (Test-Path "$INSTALL_DIR\.git") {
     Write-Host "Updating existing installation..." -ForegroundColor Yellow
     Push-Location $INSTALL_DIR
     try {
@@ -41,30 +56,24 @@ if (Test-Path $INSTALL_DIR) {
     }
     Pop-Location
 }
+elseif (Test-Path "$INSTALL_DIR\opsh.py") {
+    Write-Host "Warning: $INSTALL_DIR was installed from a local checkout and can't be updated here." -ForegroundColor Yellow
+    Write-Host "Run .\install.ps1 from that checkout, or delete $INSTALL_DIR and run this installer again." -ForegroundColor Yellow
+}
 else {
+    # Remote installation
     Write-Host "Downloading OpenSH..." -ForegroundColor Cyan
-    
-    # Try git clone first, fall back to copying local files if in development
-    $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-    if (Test-Path "$scriptPath\opsh.py") {
-        # Local installation (development mode)
-        Write-Host "Installing from local directory..." -ForegroundColor Gray
-        New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
-        Copy-Item "$scriptPath\opsh.py" "$INSTALL_DIR\" -Force
-        Copy-Item "$scriptPath\requirements.txt" "$INSTALL_DIR\" -Force
-        if (Test-Path "$scriptPath\.env") {
-            Copy-Item "$scriptPath\.env" "$INSTALL_DIR\" -Force
-        }
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "git is required to download OpenSH. Install it from https://git-scm.com" -ForegroundColor Red
+        exit 1
     }
-    else {
-        # Remote installation
-        try {
-            git clone --quiet $REPO_URL $INSTALL_DIR 2>&1 | Out-Null
-        }
-        catch {
-            Write-Host "Failed to clone repository. Please check your internet connection." -ForegroundColor Red
-            exit 1
-        }
+    try {
+        git clone --quiet $REPO_URL $INSTALL_DIR 2>&1 | Out-Null
+    }
+    catch {}
+    if (-not (Test-Path "$INSTALL_DIR\opsh.py")) {
+        Write-Host "Failed to clone repository. Please check your internet connection." -ForegroundColor Red
+        exit 1
     }
 }
 
@@ -72,25 +81,39 @@ Push-Location $INSTALL_DIR
 
 # Create Python virtual environment
 Write-Host "Setting up Python environment..." -ForegroundColor Cyan
+
+# Check exit codes of native commands instead of letting their stderr output
+# stop the script (Windows PowerShell 5.1 turns it into errors under "Stop")
+$ErrorActionPreference = "Continue"
 & $pythonCmd -m venv venv
-
-# Activate venv and install dependencies
 $venvPython = "$INSTALL_DIR\venv\Scripts\python.exe"
-$venvPip = "$INSTALL_DIR\venv\Scripts\pip.exe"
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $venvPython)) {
+    Write-Host "Failed to create a Python virtual environment." -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
 
-& $venvPip install --upgrade pip 2>&1 | Where-Object { $_ -notmatch "^\s*$" } | Out-Null
-& $venvPip install google-genai pyreadline3 2>&1 | Where-Object { $_ -notmatch "^\s*$" } | Out-Null
+# pip must be upgraded via "python -m pip" on Windows (pip.exe cannot replace itself)
+& $venvPython -m pip install --quiet --upgrade pip 2>&1 | Out-Null
+& $venvPython -m pip install --quiet -r "$INSTALL_DIR\requirements.txt" 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to install Python dependencies." -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
+$ErrorActionPreference = "Stop"
 
 Pop-Location
 
 # Create launcher batch file
 Write-Host "Creating opsh command..." -ForegroundColor Cyan
 
-$launcherContent = @"
+# %~dp0 is the launcher's own folder, so the (ASCII) file needs no user profile path
+$launcherContent = @'
 @echo off
-call "$INSTALL_DIR\venv\Scripts\activate.bat"
-python "$INSTALL_DIR\opsh.py" %*
-"@
+call "%~dp0venv\Scripts\activate.bat"
+python "%~dp0opsh.py" %*
+'@
 
 $launcherPath = "$INSTALL_DIR\opsh.cmd"
 Set-Content -Path $launcherPath -Value $launcherContent -Encoding ASCII
@@ -99,7 +122,8 @@ Set-Content -Path $launcherPath -Value $launcherContent -Encoding ASCII
 $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($userPath -notlike "*$INSTALL_DIR*") {
     Write-Host "Adding OpenSH to PATH..." -ForegroundColor Cyan
-    [Environment]::SetEnvironmentVariable("PATH", "$INSTALL_DIR;$userPath", "User")
+    $newUserPath = if ($userPath) { "$INSTALL_DIR;$userPath" } else { $INSTALL_DIR }
+    [Environment]::SetEnvironmentVariable("PATH", $newUserPath, "User")
     $env:PATH = "$INSTALL_DIR;$env:PATH"
 }
 
@@ -139,7 +163,7 @@ if (-not $hasAutoStart) {
         $autoStartCode = @"
 
 # OpenSH auto-start (remove these lines to disable)
-if (Test-Path "$launcherPath") { & "$launcherPath" }
+if (`$Host.Name -eq 'ConsoleHost' -and -not [Console]::IsInputRedirected -and (Test-Path "`$env:USERPROFILE\.opsh\opsh.cmd")) { & "`$env:USERPROFILE\.opsh\opsh.cmd" }
 "@
         Add-Content -Path $profilePath -Value $autoStartCode
         Write-Host ""

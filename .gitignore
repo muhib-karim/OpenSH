@@ -31,6 +31,14 @@ desktop.ini
 dist/
 build/
 *.egg-info/
+*.spec
+
+# Test / tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+.vercel
 
 # Terabox sync files
 *.terabox.uploading.cfg

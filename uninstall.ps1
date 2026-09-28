@@ -31,5 +31,5 @@ if (Test-Path $profilePath) {
 }
 
 Write-Host ""
-Write-Host "✓ OpenSH has been removed" -ForegroundColor Green
+Write-Host "OpenSH has been removed" -ForegroundColor Green
 Write-Host ""

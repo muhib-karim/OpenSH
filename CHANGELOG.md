@@ -7,8 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Confirmation prompt before running AI-generated commands that delete or change data, or that pipe downloads into a shell
+- `groq_model` / `gemini_model` settings in `config.json`
+- `GROQ_API_KEY` / `GEMINI_API_KEY` environment variables skip the first-run setup
+- Test suite (`python -m pytest`) with mocked Groq/Gemini calls; CI runs it on Linux, Windows and macOS
+
+### Changed
+- Default models are now `openai/gpt-oss-120b` (Groq) and `gemini-3.6-flash` (Gemini); the previous defaults were retired by the providers
+- Gemini API key is sent in the `x-goog-api-key` header instead of the URL
+- `.env` is created readable only by the current user, and API keys from it are no longer passed to the commands OpenSH runs
+- `sudo` commands, editors, pagers, bare REPLs and `git commit` without `-m` get the terminal instead of having their output captured
+- Standalone binaries keep their settings in `~/.config/opsh/`
+
+### Fixed
+- Crash on first run when there is no interactive terminal or the console can't print emoji
+- Update check compared versions as strings
+- Markdown code fences in AI replies were run as part of the command
+- Editors, pagers and other interactive commands (`vim`, `less`, `ssh`, ...) now get the terminal
+- Commands on Linux/macOS now run in bash/zsh as intended instead of `/bin/sh`
+- `install.sh` reinstall from a checkout did not update the installed copy, and it created shell rc files that did not exist
+- `install.ps1` failed under `irm | iex` and did not stop on venv/pip errors
+- `uninstall.ps1` could not be parsed by Windows PowerShell 5.1 (non-ASCII character in a BOM-less file)
+- Standalone binaries saved settings to a temporary folder that was deleted on exit
+- Crash on a malformed `config.json`, and an endless error loop when the current directory was deleted
+- Command output that is not valid UTF-8 was replaced by a decode error
+- AI replies with prose around a code block, and `cd dir && cmd` replies, now run correctly
+- Requests such as "make a folder called test" or "open the readme" were run as shell commands instead of going to the AI
+- Ctrl+C during the rate-limit wait crashed with a traceback; `!help` now describes Ctrl+C correctly
+- Quoted values in `.env` kept their quotes; Gemini auth errors now show the provider's message and the `!auth` hint
+- Re-running `install.sh`/`install.ps1` from a checkout replaced the installed `.env`; `install.sh` skipped the PATH setup when `.local/bin` appeared in a comment
+- `uninstall.sh` replaced symlinked shell rc files with copies and left the PATH lines it had added
+- The Windows `opsh` launcher broke when the user profile path had non-ASCII characters; the PowerShell auto-start line now only runs in interactive console sessions
+- The website's Copy button could stay stuck on "Copied!" and failed silently without clipboard access
+
 ### Planned
-- Customizable AI model selection
 - Command aliases
 
 ---

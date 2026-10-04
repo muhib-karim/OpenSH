@@ -103,7 +103,7 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ```mermaid
 flowchart LR
   U[You: plain-English request] --> O[opsh.py]
-  O -->|prompt + OS/shell context| L[Gemini API]
+  O -->|prompt + OS/shell context| L[LLM: Gemini or Groq]
   L -->|suggested command + explanation| O
   O --> C{Safety confirm}
   C -->|approved| S[bash / zsh / PowerShell]
@@ -111,7 +111,7 @@ flowchart LR
   S -->|output| U
 ```
 
-- `opsh.py`: the whole CLI. It detects the OS and shell, sends the request with that context to the model, shows the
+- `opsh.py`: the whole CLI. It detects the OS and shell, sends the request with that context to the configured model (Gemini or Groq), shows the
   proposed command with an explanation, and runs it only after you confirm.
 - `install.sh` / `install.ps1` (and the matching uninstallers): put `opsh` on your PATH on macOS/Linux and Windows.
 - `vercel.json`: the landing page at the homepage URL.

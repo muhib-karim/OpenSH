@@ -97,3 +97,21 @@ Distributed under the MIT License. See `LICENSE` for more information.
 <div align="center">
   <p>Made with ☕ by the AI Dev Team • © 2026</p>
 </div>
+
+## Architecture
+
+```mermaid
+flowchart LR
+  U[You: plain-English request] --> O[opsh.py]
+  O -->|prompt + OS/shell context| L[Gemini API]
+  L -->|suggested command + explanation| O
+  O --> C{Safety confirm}
+  C -->|approved| S[bash / zsh / PowerShell]
+  C -->|rejected| U
+  S -->|output| U
+```
+
+- `opsh.py`: the whole CLI. It detects the OS and shell, sends the request with that context to the model, shows the
+  proposed command with an explanation, and runs it only after you confirm.
+- `install.sh` / `install.ps1` (and the matching uninstallers): put `opsh` on your PATH on macOS/Linux and Windows.
+- `vercel.json`: the landing page at the homepage URL.

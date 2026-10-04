@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0b0f"/><stop offset="1" stop-color="#1c1606"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#facc15"/><stop offset="1" stop-color="#eab308"/></linearGradient>
+  </defs>
+  <rect width="1280" height="320" rx="24" fill="url(#bg)"/>
+  <g transform="translate(96,70)">
+    <rect width="180" height="180" rx="36" fill="#111" stroke="url(#gold)" stroke-width="6"/>
+    <path d="M44 66 L84 92 L44 118" fill="none" stroke="#facc15" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="96" y="112" width="44" height="12" rx="6" fill="#facc15"/>
+  </g>
+  <text x="330" y="160" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="96" font-weight="800" fill="#ffffff">Open<tspan fill="url(#gold)">SH</tspan></text>
+  <text x="334" y="214" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="32" fill="#d4d4d8">Talk to your terminal in plain English.</text>
+  <text x="334" y="258" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="24" fill="#a1a1aa">$ opsh -c "find videos over 1GB in Downloads"</text>
+</svg>

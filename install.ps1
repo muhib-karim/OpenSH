@@ -5,7 +5,7 @@
 $ErrorActionPreference = "Stop"
 
 $INSTALL_DIR = "$env:USERPROFILE\.opsh"
-$REPO_URL = "https://github.com/ai-dev-2024/OpenSH.git"
+$REPO_URL = "https://github.com/muhib-karim/OpenSH.git"
 
 Write-Host "Installing OpenSH..." -ForegroundColor Cyan
 

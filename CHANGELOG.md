@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-10-05
+
+### Added
+- **Safety guard**: AI-generated commands that delete data, wipe disks, rewrite git history, pipe downloads into a shell or shut the machine down now need an explicit `y` before they run (interactive and `-c` mode).
+- `-y/--yes` flag to skip the prompt for scripted use.
+- Unit tests (`tests/test_safety.py`), run in CI on Windows, macOS and Linux.
+- Local SVG banner and logo; full README with usage, safety, configuration, architecture, development and troubleshooting.
+
+### Changed
+- Repository links, installer URLs and the update check now point at `muhib-karim/OpenSH`.
+
+---
+
 ## [0.2.0] - 2026-01-31
 
 ### Added
@@ -83,8 +96,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/ai-dev-2024/OpenSH/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/ai-dev-2024/OpenSH/releases/tag/v0.2.0
-[0.1.1]: https://github.com/ai-dev-2024/OpenSH/releases/tag/v0.1.1
-[0.1.0]: https://github.com/ai-dev-2024/OpenSH/releases/tag/v0.1.0
-[0.0.1]: https://github.com/ai-dev-2024/OpenSH/releases/tag/v0.0.1
+[Unreleased]: https://github.com/muhib-karim/OpenSH/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/muhib-karim/OpenSH/releases/tag/v0.3.0
+[0.2.0]: https://github.com/muhib-karim/OpenSH/releases/tag/v0.2.0
+[0.1.1]: https://github.com/muhib-karim/OpenSH/releases/tag/v0.1.1
+[0.1.0]: https://github.com/muhib-karim/OpenSH/releases/tag/v0.1.0
+[0.0.1]: https://github.com/muhib-karim/OpenSH/releases/tag/v0.0.1

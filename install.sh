@@ -6,7 +6,7 @@
 set -e
 
 INSTALL_DIR="$HOME/.opsh"
-REPO_URL="https://github.com/ai-dev-2024/OpenSH.git"
+REPO_URL="https://github.com/muhib-karim/OpenSH.git"
 
 echo "Installing OpenSH..."
 

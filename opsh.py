@@ -8,7 +8,7 @@ Based on nlsh (https://github.com/junaid-mahmood/nlsh) by Junaid Mahmood
 Support: https://ko-fi.com/ai_dev_2024
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 import signal
 import os
@@ -67,14 +67,14 @@ PLATFORM = get_platform_info()
 def check_for_updates():
     """Check GitHub for new version (silent, non-blocking)."""
     try:
-        url = "https://api.github.com/repos/ai-dev-2024/OpenSH/releases/latest"
+        url = "https://api.github.com/repos/muhib-karim/OpenSH/releases/latest"
         req = urllib.request.Request(url, headers={"User-Agent": "OpenSH"})
         with urllib.request.urlopen(req, timeout=3) as response:
             data = json.loads(response.read().decode('utf-8'))
             latest = data.get("tag_name", "").lstrip("v")
             if latest and latest != __version__:
                 print(f"\033[33m📦 New version available: v{latest} (you have v{__version__})\033[0m")
-                print(f"\033[90m   Update: https://github.com/ai-dev-2024/OpenSH/releases/tag/v{latest}\033[0m\n")
+                print(f"\033[90m   Update: https://github.com/muhib-karim/OpenSH/releases/tag/v{latest}\033[0m\n")
     except:
         pass  # Silently fail - don't block startup
 
@@ -279,7 +279,7 @@ def show_version():
     print(f"Platform: {PLATFORM['name']} ({PLATFORM['shell']})")
     print(f"Provider: {provider}")
     print(f"Python: {platform.python_version()}")
-    print(f"GitHub: https://github.com/ai-dev-2024/OpenSH")
+    print(f"GitHub: https://github.com/muhib-karim/OpenSH")
     print()
 
 def show_credits():
@@ -474,6 +474,48 @@ def is_natural_language(text: str) -> bool:
         return False
     return not any(text.lower().startswith(s.lower()) for s in shell_starters)
 
+
+# --- Safety guard -----------------------------------------------------------
+# AI-generated commands run automatically, except ones that can destroy data or
+# take the machine down. Those are shown and need an explicit "y" first.
+import re as _re
+
+_DESTRUCTIVE_PATTERNS = [
+    r"\brm\s+(-[a-z]*[rf][a-z]*\s+)+",          # rm -r / rm -f / rm -rf
+    r"\brm\s+.*--(recursive|force)\b",
+    r"\brmdir\s+/s\b", r"\brd\s+/s\b", r"\bdel\s+.*/[sq]\b",
+    r"\bremove-item\b.*-(recurse|force)\b",
+    r"\bmkfs(\.\w+)?\b", r"\bformat(-volume)?\s+[a-z]:", r"\bdiskpart\b",
+    r"\bdd\s+.*\bof=", r">\s*/dev/(sd|nvme|disk|hd)",
+    r"\b(shutdown|reboot|halt|poweroff)\b", r"\b(stop|restart)-computer\b",
+    r"\bgit\s+push\s+.*(--force|-f)\b", r"\bgit\s+reset\s+--hard\b", r"\bgit\s+clean\s+-[a-z]*f",
+    r"\bchmod\s+(-r\s+)?[0-7]*777\s+/(\s|$)", r"\bchown\s+-r\b.*\s/(\s|$)",
+    r":\(\)\s*\{\s*:\|:&\s*\};:",            # fork bomb
+    r"\b(drop\s+(table|database))\b", r"\btruncate\s+table\b",
+    r"\bkillall\b", r"\bkill\s+-9\s+-1\b", r"\bstop-process\b.*-force",
+    r"\bcurl\b[^|]*\|\s*(sudo\s+)?(ba|z)?sh\b", r"\biwr\b[^|]*\|\s*iex\b",
+]
+_DESTRUCTIVE_RE = [_re.compile(p, _re.IGNORECASE) for p in _DESTRUCTIVE_PATTERNS]
+
+
+def is_destructive(cmd: str) -> bool:
+    """True when a command could delete data, wipe a disk, rewrite history or stop the machine."""
+    if not cmd:
+        return False
+    return any(r.search(cmd) for r in _DESTRUCTIVE_RE)
+
+
+def confirm_if_destructive(cmd: str, assume_yes: bool = False, ask=input) -> bool:
+    """Return True if the command may run. Destructive commands need an explicit yes."""
+    if not is_destructive(cmd) or assume_yes:
+        return True
+    try:
+        answer = ask("\033[31m⚠ This command can delete data or stop your machine. Run it? [y/N]\033[0m ")
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return answer.strip().lower() in ("y", "yes")
+
+
 def run_command(cmd: str) -> tuple:
     """Run a command and return (stdout, stderr)."""
     try:
@@ -508,6 +550,11 @@ def main():
         '-c', '--command',
         nargs='*',
         help='Run a single natural language query and exit'
+    )
+    parser.add_argument(
+        '-y', '--yes',
+        action='store_true',
+        help='Run destructive AI-generated commands without asking (use with care)'
     )
     parser.add_argument(
         '-v', '--version',
@@ -548,6 +595,8 @@ def main():
                     print(f"Changed to: {path}")
                 except Exception as e:
                     print(f"cd: {e}")
+            elif not confirm_if_destructive(command, args.yes):
+                print("\033[90mSkipped.\033[0m")
             else:
                 stdout, stderr = run_command(command)
                 if stdout:
@@ -673,6 +722,8 @@ def main():
                     os.chdir(path)
                 except Exception as e:
                     print(f"cd: {e}")
+            elif not confirm_if_destructive(command, args.yes):
+                print("\033[90mSkipped.\033[0m")
             else:
                 stdout, stderr = run_command(command)
                 if stdout:

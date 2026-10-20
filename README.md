@@ -10,7 +10,7 @@
 [![Release](https://img.shields.io/github/v/release/muhib-karim/OpenSH)](https://github.com/muhib-karim/OpenSH/releases/latest)
 [![Website](https://img.shields.io/badge/website-opensh.vercel.app-eab308)](https://opensh.vercel.app)
 
-**[Features](#features)** · **[Quick start](#quick-start)** · **[Usage](#usage)** · **[Safety](#safety)** · **[Architecture](#architecture)** · **[Testing](#testing)**
+**[Features](#features)** · **[Quick start](#quick-start)** · **[Usage](#usage)** · **[Safety](#safety)** · **[Architecture](#architecture)** · **[Testing](#testing)** · **[Limitations](#limitations-and-roadmap)**
 
 </div>
 
@@ -27,17 +27,23 @@ Plain shell commands (`ls`, `git status`, `Get-Process`, …) skip the model and
 
 It is a single Python file that uses only the standard library. Provider calls go through `urllib`, so there is no SDK to install.
 
+### Why it is built this way
+
+- **Low friction.** One Python file, standard library only, bring your own Groq or Gemini key. Nothing else to install or host.
+- **Fast for everyday use.** Ordinary shell input is detected locally and never sent to the model.
+- **A check before risky commands run.** Generated commands pass a regex-based destructive-command guard with its own test suite, and anything it flags needs an explicit `y`.
+
 ## Features
 
 | | |
 | :--- | :--- |
-| 🗣️ **Plain English to command** | Describe the task and get one command for your platform (`opsh.py: get_command`). |
-| 🔀 **Shell-vs-English classifier** | Known commands and prefixes (`git `, `docker `, `Get-`, `./`, pipes, …) run as typed, with no API call (`is_natural_language`). |
-| 🛡️ **Safety guard** | 26 regex patterns catch recursive deletes, disk formatting, `dd`, shutdown/reboot, force-push and hard reset, `curl \| bash`, `DROP TABLE` and more. Matching commands need an explicit `y` (`is_destructive`, `confirm_if_destructive`). |
-| 🧠 **Context-aware prompts** | The prompt includes the current folder listing, Desktop listing and the last 5 commands with trimmed output, so "open the resume folder" resolves to `Current Resume`. |
-| 🔌 **Two providers** | Groq (`llama-3.3-70b-versatile`) or Gemini (`gemini-2.0-flash`), with automatic retry and backoff on HTTP 429. |
-| 🖥️ **Cross-platform** | Windows (PowerShell, `pyreadline3` optional), macOS and Linux. |
-| 📦 **Installers and binaries** | `install.sh` / `install.ps1` set up `~/.opsh`. The release workflow builds PyInstaller binaries for all 3 OSes on every `v*` tag. |
+| **Plain English to command** | Describe the task and get one command for your platform (`opsh.py: get_command`). |
+| **Shell-vs-English classifier** | Known commands and prefixes (`git `, `docker `, `Get-`, `./`, pipes, …) run as typed, with no API call (`is_natural_language`). |
+| **Safety guard** | 26 regex patterns catch recursive deletes, disk formatting, `dd`, shutdown/reboot, force-push and hard reset, `curl \| bash`, `DROP TABLE` and more. Matching commands need an explicit `y` (`is_destructive`, `confirm_if_destructive`). |
+| **Context-aware prompts** | The prompt includes the current folder listing, Desktop listing and the last 5 commands with trimmed output, so "open the resume folder" resolves to `Current Resume`. |
+| **Two providers** | Groq (`llama-3.3-70b-versatile`) or Gemini (`gemini-2.0-flash`), with automatic retry and backoff on HTTP 429. |
+| **Cross-platform** | Windows (PowerShell, `pyreadline3` optional), macOS and Linux. |
+| **Installers and binaries** | `install.sh` / `install.ps1` set up `~/.opsh`. The release workflow builds PyInstaller binaries for all 3 OSes on every `v*` tag. |
 
 ### Demo
 
@@ -172,10 +178,11 @@ OpenSH/
 ├── requirements.txt         # only pyreadline3 on Windows (optional)
 ├── docs/
 │   ├── banner.svg, demo.svg
+│   ├── assets/              # logo.svg, banner.svg
 │   └── index.html           # landing page
 ├── vercel.json              # static hosting config for docs/
 ├── .github/workflows/       # ci.yml, release.yml
-├── CHANGELOG.md · CREDITS.md · LICENSE
+└── CHANGELOG.md · CREDITS.md · LICENSE
 ```
 
 ## Limitations and roadmap

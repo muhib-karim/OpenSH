@@ -453,10 +453,14 @@ def get_ai_response(prompt: str) -> str:
 
 # --- First-run setup ------------------------------------------------------------
 
-def setup_authentication(ask: Callable[[str], str] = input,
-                         ask_secret: Callable[[str], str] = getpass.getpass,
-                         open_url: Callable[[str], Any] = webbrowser.open) -> Optional[Dict[str, Any]]:
+def setup_authentication(ask: Optional[Callable[[str], str]] = None,
+                         ask_secret: Optional[Callable[[str], str]] = None,
+                         open_url: Optional[Callable[[str], Any]] = None) -> Optional[Dict[str, Any]]:
     """Interactive provider setup. Keys go to .env; everything else to config.json."""
+    # Defaults are looked up at call time so tests can patch input()
+    ask = ask or input
+    ask_secret = ask_secret or getpass.getpass
+    open_url = open_url or webbrowser.open
     print("\n\033[1m🔐 OpenSH Setup\033[0m\n")
     print("Choose your AI provider:\n")
     print("  \033[36m1. Groq\033[0m (Recommended - fast, free tier)")
@@ -965,8 +969,9 @@ def is_destructive(cmd: str) -> bool:
     return bool(explain_risk(cmd))
 
 
-def confirm_if_destructive(cmd: str, assume_yes: bool = False, ask: Callable[[str], str] = input) -> bool:
+def confirm_if_destructive(cmd: str, assume_yes: bool = False, ask: Optional[Callable[[str], str]] = None) -> bool:
     """Return True if the command may run. Destructive commands need an explicit yes."""
+    ask = ask or input
     reasons = explain_risk(cmd)
     if not reasons or assume_yes:
         return True
@@ -977,8 +982,9 @@ def confirm_if_destructive(cmd: str, assume_yes: bool = False, ask: Callable[[st
     return answer.strip().lower() in ("y", "yes")
 
 
-def confirm_run(ask: Callable[[str], str] = input) -> bool:
+def confirm_run(ask: Optional[Callable[[str], str]] = None) -> bool:
     """Explain mode: ask before running a command the guard did not flag (Enter means yes)."""
+    ask = ask or input
     try:
         answer = ask("\033[33mRun it? [Y/n]\033[0m ")
     except (EOFError, KeyboardInterrupt):
@@ -1082,8 +1088,9 @@ class RunOptions:
     copy: bool = False
 
 
-def handle_generated(command: str, opts: RunOptions, ask: Callable[[str], str] = input) -> bool:
+def handle_generated(command: str, opts: RunOptions, ask: Optional[Callable[[str], str]] = None) -> bool:
     """Show a generated command, then explain / copy / guard / run it. True if it ran."""
+    ask = ask or input
     print(f"\033[33m→ {command}\033[0m")
     reasons = explain_risk(command)
     if opts.copy:
@@ -1129,7 +1136,8 @@ def run_direct(cmd: str) -> None:
     add_to_history(cmd, stdout + stderr)
 
 
-def uninstall(ask: Callable[[str], str] = input) -> bool:
+def uninstall(ask: Optional[Callable[[str], str]] = None) -> bool:
+    ask = ask or input
     confirm = ask("\033[33mRemove OpenSH? [y/N]\033[0m ")
     if confirm.strip().lower() != "y":
         return False

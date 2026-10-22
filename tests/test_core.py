@@ -141,7 +141,13 @@ class HistoryFile(IsolatedTestCase):
         _, out = self.capture(opsh.show_history)
         self.assertIn("No history yet", out)
 
+    def test_history_file_is_private(self):
+        opsh.append_history("ls")
+        if os.name != "nt":
+            self.assertEqual(opsh.history_path().stat().st_mode & 0o777, 0o600)
+
     def test_looks_secret(self):
+        self.assertFalse(opsh.looks_secret("open the skeleton-app folder"))
         self.assertTrue(opsh.looks_secret("password=hunter2"))
         self.assertTrue(opsh.looks_secret("use key AIzaSyDUMMYDUMMY"))
         self.assertFalse(opsh.looks_secret("show me the token ring docs"))
@@ -321,6 +327,14 @@ class RunCommand(IsolatedTestCase):
         opsh.PLATFORM = opsh.get_platform_info()
         stdout, stderr = opsh.run_command("echo hello")
         self.assertIn("hello", stdout, stderr)
+
+    def test_status_codes(self):
+        with mock.patch.object(opsh.subprocess, "run", return_value=subprocess.CompletedProcess([], 4, "o", "e")):
+            self.assertEqual(opsh.run_command_status("x"), ("o", "e", 4))
+        with mock.patch.object(opsh.subprocess, "run", side_effect=subprocess.TimeoutExpired("x", 1)):
+            self.assertEqual(opsh.run_command_status("x")[2], 124)
+        with mock.patch.object(opsh.subprocess, "run", side_effect=OSError("gone")):
+            self.assertEqual(opsh.run_command_status("x")[2], 127)
 
     def test_timeout_and_os_errors(self):
         opsh.PLATFORM = WINDOWS

@@ -16,6 +16,7 @@ import argparse
 import getpass
 import importlib
 import json
+import math
 import os
 import platform
 import re
@@ -157,7 +158,15 @@ def exit_handler(sig: int, frame: Any) -> None:
 
 # --- Settings: config.json and .env next to the program -----------------------
 
-script_dir = Path(__file__).parent.absolute()
+def _program_dir() -> Path:
+    """Settings live next to opsh.py, or next to the executable for a PyInstaller build
+    (whose __file__ is a temporary folder that disappears after each run)."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).parent.absolute()
+
+
+script_dir = _program_dir()
 env_path = script_dir / ".env"
 config_path = script_dir / "config.json"
 
@@ -175,6 +184,20 @@ def load_config() -> Dict[str, Any]:
         except (OSError, ValueError):
             return {}
     return {}
+
+
+def config_problem() -> Optional[str]:
+    """Why config.json can't be used, or None. A broken file is reported, never overwritten."""
+    if not config_path.exists():
+        return None
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        return f"{config_path} is not valid JSON ({e}). Fix or delete it."
+    if not isinstance(data, dict):
+        return f"{config_path} must contain a JSON object. Fix or delete it."
+    return None
 
 
 def save_config(config: Dict[str, Any]) -> None:
@@ -256,9 +279,12 @@ def redact(text: str, secrets: Sequence[Optional[str]]) -> str:
 def _retry_after(error: urllib.error.HTTPError) -> Optional[float]:
     value = error.headers.get("Retry-After") if error.headers else None
     try:
-        return min(float(value), MAX_BACKOFF) if value is not None else None
+        seconds = float(value) if value is not None else None
     except ValueError:
         return None
+    if seconds is None or not math.isfinite(seconds) or seconds <= 0:
+        return None
+    return min(seconds, MAX_BACKOFF)
 
 
 def http_post_json(
@@ -302,13 +328,17 @@ def http_post_json(
                 body = ""
             raise ProviderError(redact(f"API error {e.code}: {body[:200]}", secrets)) from None
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            reason = getattr(e, "reason", e)
+            if isinstance(reason, InterruptedError):  # Ctrl+C while connecting: cancel, don't retry
+                raise reason from None
             if not last:
                 sleep(wait)
                 continue
-            reason = getattr(e, "reason", e)
             raise ProviderError(redact(f"Network error: {reason}", secrets)) from None
-        except ValueError:
+        except json.JSONDecodeError:
             raise ProviderError("Invalid JSON from provider") from None
+        except ValueError as e:  # bad header or URL, e.g. a key with non-ASCII characters
+            raise ProviderError(redact(f"Request failed: {e}", secrets)) from None
     raise ProviderError("No response from provider")  # pragma: no cover - loop always returns or raises
 
 
@@ -640,7 +670,7 @@ def get_file_context(cwd: str) -> str:
 HISTORY_LIMIT = 1000
 _SECRET_RE = re.compile(
     r"(api[_-]?key|token|secret|passw(or)?d|bearer|authorization)\s*[=:]"
-    r"|\b(sk|gsk|ghp|gho|github_pat|xox[abp]|AIza)[-_A-Za-z0-9]{8,}",
+    r"|\b(?:sk-|gsk_|ghp_|gho_|github_pat_|xox[abp]-|AIza)[-_A-Za-z0-9]{8,}",
     re.IGNORECASE,
 )
 
@@ -682,6 +712,10 @@ def append_history(line: str, path: Optional[Path] = None) -> bool:
     try:
         with open(path, "a", encoding="utf-8") as f:
             f.write(line.replace("\n", " ") + "\n")
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
         lines = read_history_file(path)
         if path.stat().st_size > 200 * HISTORY_LIMIT:
             with open(path, "w", encoding="utf-8") as f:
@@ -1041,17 +1075,23 @@ def shell_argv(cmd: str) -> List[str]:
     return [shutil.which(shell) or "/bin/sh", "-c", cmd]
 
 
-def run_command(cmd: str) -> Tuple[str, str]:
-    """Run a command and return (stdout, stderr). 60 s timeout on Windows, none elsewhere."""
+def run_command_status(cmd: str) -> Tuple[str, str, int]:
+    """Run a command and return (stdout, stderr, exit code). 60 s timeout on Windows, none elsewhere."""
     timeout = 60 if PLATFORM["name"] == "Windows" else None
     try:
         result = subprocess.run(shell_argv(cmd), capture_output=True, text=True, encoding="utf-8",
                                 errors="replace", timeout=timeout)
-        return result.stdout, result.stderr
+        return result.stdout, result.stderr, result.returncode
     except subprocess.TimeoutExpired:
-        return "", "Command timed out"
+        return "", "Command timed out", 124
     except OSError as e:
-        return "", str(e)
+        return "", str(e), 127
+
+
+def run_command(cmd: str) -> Tuple[str, str]:
+    """Run a command and return (stdout, stderr)."""
+    stdout, stderr, _ = run_command_status(cmd)
+    return stdout, stderr
 
 
 _CD_PREFIXES = ("cd ", "set-location ", "chdir ", "sl ")
@@ -1101,8 +1141,11 @@ class RunOptions:
     copy: bool = False
 
 
-def handle_generated(command: str, opts: RunOptions, ask: Optional[Callable[[str], str]] = None) -> bool:
-    """Show a generated command, then explain / copy / guard / run it. True if it ran."""
+def handle_generated(command: str, opts: RunOptions, ask: Optional[Callable[[str], str]] = None) -> Optional[int]:
+    """Show a generated command, then explain / copy / guard / run it.
+
+    Returns the command's exit code, or None when it was not run (dry run or skipped).
+    """
     ask = ask or input
     print(f"\033[33m→ {command}\033[0m")
     reasons = explain_risk(command)
@@ -1121,24 +1164,24 @@ def handle_generated(command: str, opts: RunOptions, ask: Optional[Callable[[str
                 print(f"\033[31m⚠ {reason}\033[0m")
     if opts.dry_run:
         print("\033[90m(dry run - not executed)\033[0m")
-        return False
+        return None
     target = cd_target(command)
     if target is not None:
-        return change_directory(target)
+        return 0 if change_directory(target) else 1
     if reasons:
         if not confirm_if_destructive(command, opts.yes, ask):
             print("\033[90mSkipped.\033[0m")
-            return False
+            return None
     elif opts.explain and not opts.yes and not confirm_run(ask):
         print("\033[90mSkipped.\033[0m")
-        return False
-    stdout, stderr = run_command(command)
+        return None
+    stdout, stderr, code = run_command_status(command)
     if stdout:
         print(stdout)
     if stderr:
         print(stderr)
     add_to_history(command, stdout + stderr)
-    return True
+    return code
 
 
 def run_direct(cmd: str) -> None:
@@ -1216,7 +1259,7 @@ def _thinking(on: bool) -> None:
 
 
 def run_once(query: str, opts: RunOptions) -> int:
-    """-c mode: one request, one command."""
+    """-c mode: one request, one command. Exit code: the command's, 0 for a dry run, 1 if skipped or failed."""
     try:
         _thinking(True)
         command = get_command(query, os.getcwd())
@@ -1224,8 +1267,10 @@ def run_once(query: str, opts: RunOptions) -> int:
         if not command:
             print("\033[31mError: the model returned an empty command\033[0m")
             return 1
-        handle_generated(command, opts)
-        return 0
+        code = handle_generated(command, opts)
+        if code is None:
+            return 0 if opts.dry_run else 1
+        return code
     except ProviderError as e:
         _thinking(False)
         print(f"\033[31mError: {e}\033[0m")
@@ -1345,8 +1390,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     _safe_output()
     args = build_parser().parse_args(argv)
     load_env()
-    if args.shell:
-        PLATFORM = get_platform_info(shell=args.shell)
+    PLATFORM = get_platform_info(shell=args.shell)  # after load_env, so OPENSH_SHELL in .env counts
+    problem = config_problem()
+    if problem:
+        print(f"\033[31m{problem}\033[0m")
+        return 1
     SESSION_OVERRIDES.clear()
     if args.provider:
         SESSION_OVERRIDES["provider"] = args.provider

@@ -71,6 +71,22 @@ class Http(IsolatedTestCase):
         _, _, sleeps, _ = self.post(http_error(429, headers={"Retry-After": "soon"}), ok({}))
         self.assertEqual(sleeps, [2.0])
 
+    def test_negative_or_nan_retry_after_uses_backoff(self):
+        for value in ("-5", "nan"):
+            with self.subTest(value=value):
+                _, _, sleeps, _ = self.post(http_error(503, headers={"Retry-After": value}), ok({}))
+                self.assertEqual(sleeps, [2.0])
+
+    def test_ctrl_c_while_connecting_is_not_retried(self):
+        with self.assertRaises(InterruptedError):
+            self.post(urllib.error.URLError(InterruptedError()), ok({}))
+
+    def test_request_errors_are_not_called_invalid_json(self):
+        with self.assertRaises(opsh.ProviderError) as ctx:
+            self.post(ValueError("header value for secret-key-123 is invalid"), secrets=["secret-key-123"])
+        self.assertIn("Request failed", str(ctx.exception))
+        self.assertNotIn("secret-key-123", str(ctx.exception))
+
     def test_gives_up_on_repeated_429(self):
         with self.assertRaisesRegex(opsh.ProviderError, "Rate limit"):
             self.post(http_error(429), http_error(429), http_error(429))

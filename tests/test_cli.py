@@ -27,30 +27,30 @@ def answers(*items):
 
 class HandleGenerated(IsolatedTestCase):
     def run_handle(self, command, ask=None, **opts):
-        with mock.patch.object(opsh, "run_command", return_value=("out\n", "err\n")) as run:
+        with mock.patch.object(opsh, "run_command_status", return_value=("out\n", "err\n", 0)) as run:
             ran, out = self.capture(opsh.handle_generated, command, opsh.RunOptions(**opts), ask or answers())
         return ran, out, run
 
     def test_safe_command_runs_and_is_remembered(self):
         ran, out, run = self.run_handle("ls -la")
-        self.assertTrue(ran)
+        self.assertEqual(ran, 0)
         run.assert_called_once_with("ls -la")
         self.assertIn("→ ls -la", out)
         self.assertEqual(opsh.command_history[-1]["command"], "ls -la")
 
     def test_destructive_command_skipped_without_yes(self):
         ran, out, run = self.run_handle("rm -rf build", answers("n"))
-        self.assertFalse(ran)
+        self.assertIsNone(ran)
         run.assert_not_called()
         self.assertIn("Skipped", out)
 
     def test_destructive_command_runs_with_yes_flag(self):
         ran, _, run = self.run_handle("rm -rf build", yes=True)
-        self.assertTrue(ran)
+        self.assertEqual(ran, 0)
 
     def test_dry_run_never_runs(self):
         ran, out, run = self.run_handle("rm -rf build", dry_run=True)
-        self.assertFalse(ran)
+        self.assertIsNone(ran)
         run.assert_not_called()
         self.assertIn("dry run", out)
 
@@ -58,7 +58,7 @@ class HandleGenerated(IsolatedTestCase):
         self.use_mock_provider()
         prompts = []
         ran, out, _ = self.run_handle("rm -rf build", lambda p: prompts.append(p) or "y", explain=True)
-        self.assertTrue(ran)
+        self.assertEqual(ran, 0)
         self.assertIn("Mock explanation", out)
         self.assertNotIn("⚠", out)  # the reason is shown once, in the prompt
         self.assertIn("Deletes files recursively", prompts[0])
@@ -71,14 +71,14 @@ class HandleGenerated(IsolatedTestCase):
     def test_explain_asks_even_for_safe_commands(self):
         self.use_mock_provider()
         ran, out, run = self.run_handle("ls", answers("n"), explain=True)
-        self.assertFalse(ran)
+        self.assertIsNone(ran)
         self.assertIn("Skipped", out)
         ran, _, _ = self.run_handle("ls", answers(""), explain=True)
-        self.assertTrue(ran)
+        self.assertEqual(ran, 0)
         ran, _, _ = self.run_handle("ls", answers(), explain=True)  # Ctrl+D means no
-        self.assertFalse(ran)
+        self.assertIsNone(ran)
         ran, _, _ = self.run_handle("ls", answers(), explain=True, yes=True)
-        self.assertTrue(ran)
+        self.assertEqual(ran, 0)
 
     def test_explain_survives_provider_errors(self):
         with mock.patch.object(opsh, "explain_command", side_effect=opsh.ProviderError("offline")):
@@ -96,7 +96,7 @@ class HandleGenerated(IsolatedTestCase):
 
     def test_cd_is_handled_in_process(self):
         ran, _, run = self.run_handle(f"cd {self.tmp}")
-        self.assertTrue(ran)
+        self.assertEqual(ran, 0)
         run.assert_not_called()
         self.assertEqual(os.path.realpath(os.getcwd()), os.path.realpath(self.tmp))
 
@@ -104,7 +104,7 @@ class HandleGenerated(IsolatedTestCase):
 class RunOnce(IsolatedTestCase):
     def test_success_empty_and_error(self):
         self.use_mock_provider("ls")
-        with mock.patch.object(opsh, "handle_generated") as handle:
+        with mock.patch.object(opsh, "handle_generated", return_value=0) as handle:
             code, _ = self.capture(opsh.run_once, "list", opsh.RunOptions())
         self.assertEqual(code, 0)
         handle.assert_called_once()
@@ -116,6 +116,27 @@ class RunOnce(IsolatedTestCase):
         code, out = self.capture(opsh.run_once, "list", opsh.RunOptions())
         self.assertEqual(code, 1)
         self.assertIn("No Groq API key", out)
+
+
+class ExitCodes(IsolatedTestCase):
+    def run_c(self, response, answer="n", status=("", "", 0), **opts):
+        self.use_mock_provider(response)
+        with mock.patch("builtins.input", answers(answer)), \
+                mock.patch.object(opsh, "run_command_status", return_value=status):
+            code, _ = self.capture(opsh.run_once, "do it", opsh.RunOptions(**opts))
+        return code
+
+    def test_exit_code_follows_the_command(self):
+        self.assertEqual(self.run_c("ls", status=("", "boom", 3)), 3)
+        self.assertEqual(self.run_c("ls"), 0)
+
+    def test_skipped_command_exits_1_and_dry_run_exits_0(self):
+        self.assertEqual(self.run_c("rm -rf build", answer="n"), 1)
+        self.assertEqual(self.run_c("rm -rf build", dry_run=True), 0)
+
+    def test_cd_exit_codes(self):
+        self.assertEqual(self.run_c(f"cd {self.tmp}"), 0)
+        self.assertEqual(self.run_c(f"cd {self.tmp / 'missing'}"), 1)
 
 
 class SetupAuthentication(IsolatedTestCase):
@@ -271,7 +292,7 @@ class Repl(IsolatedTestCase):
 
     def test_english_goes_through_the_model_and_can_be_copied(self):
         self.use_mock_provider("ls -la")
-        with mock.patch.object(opsh, "run_command", return_value=("", "")) as run, \
+        with mock.patch.object(opsh, "run_command_status", return_value=("", "", 0)) as run, \
                 mock.patch.object(opsh, "copy_to_clipboard", side_effect=[True, False]):
             _, out = self.repl("list my files", "!copy", "!copy", "exit")
         run.assert_called_once_with("ls -la")
@@ -337,6 +358,31 @@ class Main(IsolatedTestCase):
             self.capture(opsh.main, ["--no-history"])
         self.assertEqual(repl.call_args[0][1], False)
 
+    def test_shell_from_env_file_is_used(self):
+        opsh.env_path.write_text("OPENSH_SHELL=zsh\n")
+        with mock.patch.object(opsh, "run_once", return_value=0):
+            self.capture(opsh.main, ["--provider", "mock", "-c", "x"])
+        self.assertEqual(opsh.PLATFORM["shell"], "zsh")
+
+    def test_corrupt_config_is_not_overwritten(self):
+        opsh.config_path.write_text("{oops")
+        with mock.patch.object(opsh, "setup_authentication") as setup:
+            code, out = self.capture(opsh.main, [])
+        self.assertEqual(code, 1)
+        setup.assert_not_called()
+        self.assertIn("not valid JSON", out)
+        self.assertEqual(opsh.config_path.read_text(), "{oops")
+        opsh.config_path.write_text("[]")
+        code, out = self.capture(opsh.main, [])
+        self.assertIn("must contain a JSON object", out)
+
+    def test_program_dir_for_frozen_binaries(self):
+        exe = self.tmp / "dist" / "opsh"
+        with mock.patch.object(opsh.sys, "frozen", True, create=True), \
+                mock.patch.object(opsh.sys, "executable", str(exe)):
+            self.assertEqual(opsh._program_dir(), exe.resolve().parent)
+        self.assertEqual(opsh._program_dir(), ROOT)
+
     def test_safe_output_switches_streams_to_replace(self):
         stream = mock.Mock()
         broken = mock.Mock()
@@ -376,7 +422,7 @@ class EndToEnd(unittest.TestCase):
 
     def test_guard_blocks_destructive_command_without_tty(self):
         result = self.run_opsh("-c", "clean", env_extra={"OPENSH_MOCK_RESPONSE": "rm -rf /tmp/opensh-never"})
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 1, result.stderr)  # skipped
         self.assertIn("Skipped", result.stdout)
 
 

@@ -670,7 +670,7 @@ def get_file_context(cwd: str) -> str:
 HISTORY_LIMIT = 1000
 _SECRET_RE = re.compile(
     r"(api[_-]?key|token|secret|passw(or)?d|bearer|authorization)\s*[=:]"
-    r"|\b(?:sk-|gsk_|ghp_|gho_|github_pat_|xox[abp]-|AIza)[-_A-Za-z0-9]{8,}",
+    r"|\b(?:sk-|gsk_|gh[op]_|github_[p]at_|xox[abp]-|AIza)[-_A-Za-z0-9]{8,}",
     re.IGNORECASE,
 )
 

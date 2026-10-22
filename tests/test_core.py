@@ -149,6 +149,7 @@ class HistoryFile(IsolatedTestCase):
     def test_looks_secret(self):
         self.assertFalse(opsh.looks_secret("open the skeleton-app folder"))
         self.assertTrue(opsh.looks_secret("password=hunter2"))
+        self.assertTrue(opsh.looks_secret("token " + "gh" + "p_" + "a1" * 10))
         self.assertTrue(opsh.looks_secret("use key AIzaSyDUMMYDUMMY"))
         self.assertFalse(opsh.looks_secret("show me the token ring docs"))
 

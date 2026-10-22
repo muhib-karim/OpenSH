@@ -30,7 +30,6 @@ warn_return_any = true
 no_implicit_optional = true
 
 [tool.coverage.run]
-source = ["."]
 include = ["opsh.py"]
 branch = true
 

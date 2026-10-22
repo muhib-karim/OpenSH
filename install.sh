@@ -15,6 +15,10 @@ if ! command -v python3 &> /dev/null; then
     echo "Python 3 is required. Please install it first."
     exit 1
 fi
+if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))'; then
+    echo "OpenSH needs Python 3.10 or newer (found $(python3 --version 2>&1))."
+    exit 1
+fi
 
 # Clone or update repository
 if [ -d "$INSTALL_DIR" ]; then

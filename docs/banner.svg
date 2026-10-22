@@ -33,7 +33,7 @@
     </g>
     <text x="164" y="146" font-size="64" font-weight="700" fill="#f8fafc" letter-spacing="-1">Open<tspan fill="url(#gold)">SH</tspan></text>
     <text x="82" y="204" font-size="26" fill="#cbd5e1">Talk to your terminal in plain English.</text>
-    <text x="82" y="244" font-size="18" fill="#94a3b8">Groq or Gemini · PowerShell, Bash, Zsh · safety guard</text>
+    <text x="82" y="244" font-size="18" fill="#94a3b8">Groq · Gemini · OpenAI-compatible · Ollama · safety guard</text>
   </g>
 
   <!-- Terminal motif -->

@@ -14,7 +14,7 @@ $pythonCmd = $null
 foreach ($cmd in @("python", "python3", "py")) {
     try {
         $version = & $cmd --version 2>&1
-        if ($LASTEXITCODE -eq 0 -and $version -match "Python 3") {
+        if ($LASTEXITCODE -eq 0 -and $version -match "Python 3\.(\d+)" -and [int]$Matches[1] -ge 10) {
             $pythonCmd = $cmd
             break
         }
@@ -23,7 +23,7 @@ foreach ($cmd in @("python", "python3", "py")) {
 }
 
 if (-not $pythonCmd) {
-    Write-Host "Python 3 is required. Please install it from https://python.org" -ForegroundColor Red
+    Write-Host "Python 3.10 or newer is required. Please install it from https://python.org" -ForegroundColor Red
     exit 1
 }
 

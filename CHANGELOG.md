@@ -7,24 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- `tests/test_core.py`: 40 unit tests for the classifier, history, config/.env, prompt building, provider parsing and 429 retry (mocked), `run_command`, `!help` and a `--help`/`--version` smoke test.
-- Ruff lint job in CI (syntax errors and undefined names).
-- New README banner (`docs/banner.svg`) and a demo image (`docs/demo.svg`) of real CLI output.
+### Planned
+- Command aliases
+- Per-folder context hints
 
-### Fixed
-- Update check only reports a release that is actually newer (it used to report any different version, including older ones).
-- Provider requests send the current version in `User-Agent` (was hard-coded to 0.2.0).
-- `!help` shows the correct exit key on macOS/Linux (Ctrl+D; Ctrl+C cancels the line there).
-- Bare `except:` clauses narrowed so they no longer swallow `KeyboardInterrupt`/`SystemExit`.
+---
+
+## [0.4.0] - 2026-10-22
+
+### Added
+- **Safety guard rebuilt as a rule table**: 61 rules, each with a plain-English reason that is shown in the prompt (`⚠ Deletes files recursively or without asking. Run it? [y/N]`). Rules match at command position (start of line, after `;` `&&` `||` `|`, inside `$(…)`, behind `sudo`/`xargs`/`find -exec`/`nohup`…), so `cat shutdown.log` no longer counts as a shutdown. New coverage: `find -delete`, `shred`, `wipefs`, partition tools, `diskutil erase*`, `Format-Volume`/`Clear-Disk`, `cipher /w`, `vssadmin delete shadows`, `bcdedit`, recursive `chmod`/`chown` on system folders, `icacls … Everyone`, `takeown /r`, named and PowerShell/batch fork bombs, `pkill -9`, `taskkill /f`, `systemctl poweroff`, `init 0`, `git push origin +branch`, `git branch -D`, `git filter-branch`, `git checkout -- .`, `wget | sh`, `curl | python`, `bash <(curl …)`, `sh -c "$(curl …)"`, `irm | iex`, `iex (…).DownloadString`, writes to `/etc`, `crontab -r`, `reg delete`, `Set-ExecutionPolicy Unrestricted`, Defender switches, `FLUSHALL`, `docker … prune`, `kubectl delete`, `terraform destroy`.
+- **Explain-before-run**: `-e/--explain` and the `!explain` toggle show a short model explanation of each command, then ask before running it.
+- **`-n/--dry-run`** and the `!dry-run` toggle: show commands, never run them.
+- **`--copy`** and `!copy`: copy the generated command with `clip`, `pbcopy`, `wl-copy`, `xclip` or `xsel`.
+- **Pluggable providers**: Groq, Gemini, any OpenAI-compatible endpoint (`base_url`, `model`, `api_key_env` in `config.json`), local Ollama (`OLLAMA_HOST`), and an offline `mock` provider (`OPENSH_MOCK_RESPONSE`). `!auth` sets up all of them. `--provider`/`--model` and `OPENSH_PROVIDER`/`OPENSH_MODEL`/`OPENSH_BASE_URL`/`OPENSH_TIMEOUT` override per run.
+- Shared HTTP layer with a configurable timeout, retries with exponential backoff on HTTP 429/5xx and network errors, and `Retry-After` support.
+- **Shell auto-detection** from `OPENSH_SHELL` or `$SHELL` (bash, zsh, PowerShell/pwsh), with `--shell` to override. Commands now run in the detected shell instead of `/bin/sh`.
+- **History file** (`~/.opsh/history`, 1000 lines) loaded into arrow-key history on start; `!history` shows it; lines that look like keys or passwords are never saved; `--no-history` or `"history": false` turns it off.
+- `--help` examples, `docs/opsh.1` man page.
+- CI: ruff, mypy, unittest under coverage with an 85% gate on Ubuntu/macOS/Windows × Python 3.10/3.12/3.13, gitleaks, CodeQL and Dependabot.
+- Release workflow runs the tests first, smoke-tests each PyInstaller binary with the offline provider, ships the man page and `SHA256SUMS.txt`, and builds (without publishing) on `upgrade/**` branches.
+- Test suite: 118 stdlib `unittest` tests (99% line coverage), including 135 table-driven destructive/benign guard pairs across bash, zsh, PowerShell and cmd, and end-to-end runs of the real script.
+- Landing page redesign, new README with guard table, provider configuration and architecture diagram, refreshed demo image.
 
 ### Changed
-- `requirements.txt` no longer lists the unused `google-genai` and `google-auth-oauthlib` packages; OpenSH only uses the standard library.
-- `CREDITS.md` filled in.
+- **Gemini key moved from the request URL to the `x-goog-api-key` header**, so it can no longer end up in URLs or proxy logs.
+- API keys are scrubbed from every error message; `!auth` reads keys with hidden input; `.env` is written with mode 600 on macOS/Linux.
+- Variables already set in the environment now take precedence over `.env`.
+- Default Gemini model is now `gemini-2.5-flash`; every model is configurable.
+- Plain `cd` commands are handled in-process, but chained ones (`cd build && make`) now run in the shell instead of being mangled.
+- Markdown fences, backticks and `$ ` prompts are stripped from model output.
+- Minimum Python is 3.10 (3.9 is end-of-life).
+- Tests moved from pytest to the standard library's `unittest`.
 
-### Planned
-- Customizable AI model selection
-- Command aliases
+### Fixed
+- Output no longer crashes with `UnicodeEncodeError` when piped or on a legacy (cp1252) Windows console.
+- An unreadable or non-object `config.json` is treated as empty instead of crashing.
+- Update check only reports a release that is actually newer; provider requests send the current version in `User-Agent`; `!help` shows the right exit key per OS; bare `except:` clauses narrowed (all since 0.3.0).
 
 ---
 
@@ -104,6 +123,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 0.4.0 | 2026-10-22 | Rule-table safety guard, pluggable providers, explain/dry-run/copy, CI gates |
+| 0.3.0 | 2026-10-05 | Safety guard for destructive commands, tests, docs |
 | 0.2.0 | 2026-01-31 | Groq support, auto-execute, cross-platform releases |
 | 0.1.1 | 2026-01-30 | Quick query mode, simplified auth |
 | 0.1.0 | 2026-01-30 | Auth menu, config storage |
@@ -111,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/muhib-karim/OpenSH/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/muhib-karim/OpenSH/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/muhib-karim/OpenSH/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/muhib-karim/OpenSH/releases/tag/v0.3.0
 [0.2.0]: https://github.com/muhib-karim/OpenSH/releases/tag/v0.2.0
 [0.1.1]: https://github.com/muhib-karim/OpenSH/releases/tag/v0.1.1

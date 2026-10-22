@@ -1,27 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="456" viewBox="0 0 760 456" role="img" aria-label="Terminal session: opsh --version, --help and the test suite">
-<rect width="760" height="456" rx="12" fill="#0d0d12" stroke="#2a2a33" stroke-width="2"/>
-<path d="M0 12 A12 12 0 0 1 12 0 H748 A12 12 0 0 1 760 12 V34 H0 Z" fill="#17171f"/>
-<circle cx="22" cy="17" r="6" fill="#ef4444"/><circle cx="42" cy="17" r="6" fill="#eab308"/><circle cx="62" cy="17" r="6" fill="#22c55e"/>
-<text x="380" y="22" font-family="Consolas, Menlo, monospace" font-size="13" fill="#64748b" text-anchor="middle">real terminal output</text>
-<g font-family="Consolas, Menlo, monospace" font-size="14" xml:space="preserve">
-<text x="24" y="56"><tspan fill="#22c55e">$ </tspan><tspan fill="#f8fafc">python opsh.py --version</tspan></text>
-<text x="24" y="76" fill="#fde047">OpenSH v0.3.0</text>
-<text x="24" y="96"><tspan fill="#22c55e">$ </tspan><tspan fill="#f8fafc">python opsh.py --help</tspan></text>
-<text x="24" y="116" fill="#cbd5e1">usage: opsh.py [-h] [-c [COMMAND ...]] [-y] [-v]</text>
-<text x="24" y="136" fill="#cbd5e1"></text>
-<text x="24" y="156" fill="#cbd5e1">OpenSH - Talk to your terminal in plain English</text>
-<text x="24" y="176" fill="#cbd5e1"></text>
-<text x="24" y="196" fill="#cbd5e1">options:</text>
-<text x="24" y="216" fill="#cbd5e1">  -h, --help            show this help message and exit</text>
-<text x="24" y="236" fill="#cbd5e1">  -c [COMMAND ...], --command [COMMAND ...]</text>
-<text x="24" y="256" fill="#cbd5e1">                        Run a single natural language query and exit</text>
-<text x="24" y="276" fill="#cbd5e1">  -y, --yes             Run destructive AI-generated commands without asking</text>
-<text x="24" y="296" fill="#cbd5e1">                        (use with care)</text>
-<text x="24" y="316" fill="#cbd5e1">  -v, --version         show program's version number and exit</text>
-<text x="24" y="336" fill="#cbd5e1"></text>
-<text x="24" y="356" fill="#cbd5e1">Example: opsh -c 'show me large files'</text>
-<text x="24" y="376"><tspan fill="#22c55e">$ </tspan><tspan fill="#f8fafc">python -m pytest -q tests</tspan></text>
-<text x="24" y="396" fill="#4ade80">......................................................................   [100%]</text>
-<text x="24" y="416" fill="#4ade80">70 passed</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="450" viewBox="0 0 760 450" role="img" aria-label="Terminal session: opsh --version, an explained command held by the safety guard, a dry run, and the test suite passing">
+<rect width="760" height="450" rx="12" fill="#0f0d0a" stroke="#2e2a22" stroke-width="2"/>
+<path d="M1 12 A11 11 0 0 1 12 1 H748 A11 11 0 0 1 759 12 V36 H1 Z" fill="#14120e"/>
+<circle cx="22" cy="18" r="6" fill="#ff6b5e"/><circle cx="42" cy="18" r="6" fill="#f5a524"/><circle cx="62" cy="18" r="6" fill="#5fd38d"/>
+<text x="380" y="23" font-family="Consolas, Menlo, monospace" font-size="13" fill="#8f8676" text-anchor="middle">opsh 0.4.0</text>
+<g font-family="Consolas, Menlo, 'DejaVu Sans Mono', monospace" font-size="14" xml:space="preserve" style="white-space:pre">
+<text x="24" y="58"><tspan fill="#5fd38d">$ </tspan><tspan fill="#f4efe6">opsh --version</tspan></text>
+<text x="24" y="79"><tspan fill="#f5a524">OpenSH v0.4.0</tspan></text>
+<text x="24" y="121"><tspan fill="#5fd38d">$ </tspan><tspan fill="#f4efe6">opsh --explain -c &quot;clean the build folder&quot;</tspan></text>
+<text x="24" y="142"><tspan fill="#f5a524">→ rm -rf build</tspan></text>
+<text x="24" y="163"><tspan fill="#6cc7d9">ℹ Deletes the build folder and everything in it.</tspan></text>
+<text x="24" y="184"><tspan fill="#ff6b5e">⚠ Deletes files recursively or without asking. Run it? [y/N] </tspan><tspan fill="#f4efe6">n</tspan></text>
+<text x="24" y="205"><tspan fill="#b9b0a0">Skipped.</tspan></text>
+<text x="24" y="247"><tspan fill="#5fd38d">$ </tspan><tspan fill="#f4efe6">opsh --dry-run -c &quot;show disk usage by folder&quot;</tspan></text>
+<text x="24" y="268"><tspan fill="#f5a524">→ du -sh */ | sort -rh</tspan></text>
+<text x="24" y="289"><tspan fill="#b9b0a0">(dry run - not executed)</tspan></text>
+<text x="24" y="331"><tspan fill="#5fd38d">$ </tspan><tspan fill="#f4efe6">python -m unittest discover -s tests</tspan></text>
+<text x="24" y="352"><tspan fill="#b9b0a0">Ran 118 tests in 0.8s</tspan></text>
+<text x="24" y="373"><tspan fill="#5fd38d">OK</tspan></text>
+<text x="24" y="394"><tspan fill="#5fd38d">$ </tspan><tspan fill="#f4efe6">coverage report</tspan></text>
+<text x="24" y="415"><tspan fill="#5fd38d">opsh.py    802 stmts    2 miss    99%</tspan></text>
 </g>
 </svg>

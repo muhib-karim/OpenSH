@@ -36,11 +36,11 @@ It is **one Python file that uses only the standard library**. Provider calls go
 
 ## What's new in 0.4.0
 
-- **Safety guard rebuilt**: 61 rules with a plain-English reason each, matched where a command actually starts, across bash, zsh, PowerShell and cmd; 135 destructive/benign test pairs.
+- **Safety guard rebuilt**: 63 rules with a plain-English reason each, matched where a command actually starts (also behind `sudo -u`, `VAR=`, `bash -c`, `ssh host`, `cmd /c`, `docker exec`), across bash, zsh, PowerShell and cmd; 155 destructive/benign test pairs.
 - **Explain before run** (`--explain`, `!explain`), **dry run** (`--dry-run`), **copy to clipboard** (`--copy`).
 - **Any model**: Groq, Gemini, any OpenAI-compatible endpoint, local Ollama, and an offline mock provider. Timeouts, retries and `Retry-After`; keys never printed.
 - **Shell auto-detect**, persistent **history file**, `--help` examples and a **man page**.
-- **CI gates**: ruff, mypy, 118 unittest tests at 99% coverage on Linux/macOS/Windows, gitleaks, CodeQL, Dependabot; release binaries are smoke-tested before publishing.
+- **CI gates**: ruff, mypy, 130 unittest tests at 99% coverage on Linux/macOS/Windows, gitleaks, CodeQL, Dependabot; release binaries are smoke-tested before publishing.
 
 See the [CHANGELOG](CHANGELOG.md) for the full list.
 
@@ -90,7 +90,7 @@ OPENSH_PROVIDER=mock opsh -n -c "list files"   # offline demo, no key needed
 
 | Flag | Effect |
 | :--- | :--- |
-| `-c`, `--command TEXT…` | Handle one request and exit. |
+| `-c`, `--command TEXT…` | Handle one request and exit with the command's exit code (1 if it was skipped, 0 for a dry run). |
 | `-n`, `--dry-run` | Show generated commands, never run them. |
 | `-e`, `--explain` | Explain each command (and why the guard flagged it), then ask. |
 | `-y`, `--yes` | Run flagged commands without asking. Use with care. |
@@ -118,7 +118,7 @@ Inside the interactive shell:
 
 ## Safety
 
-Every generated command is checked by `explain_risk()` before it runs. Rules match where a command actually starts (start of line, after `;` `&&` `||` `|`, inside `$(…)`, behind `sudo`, `xargs`, `find -exec`, `nohup` and friends), so `cat shutdown.log` and `echo reboot` pass while `sudo shutdown -h now` does not.
+Every generated command is checked by `explain_risk()` before it runs. Rules match where a command actually starts (start of line, after `;` `&&` `||` `|`, inside `$(…)` or quotes, after `bash -c`/`cmd /c`/`powershell -Command`, after `ssh host` or `docker exec`, behind `sudo -u x`, `VAR=value`, `timeout N`, `xargs`, `find -exec` and friends), so `cat shutdown.log` and `echo reboot` pass while `sudo shutdown -h now` does not.
 
 | Category | Held for a `y` | Runs straight away |
 | :--- | :--- | :--- |
@@ -131,11 +131,12 @@ Every generated command is checked by `explain_risk()` before it runs. Rules mat
 | Git history | `git push --force`, `git push origin +main`, `git reset --hard`, `git clean -fdx`, `git branch -D x` | `git push origin main`, `git reset --soft HEAD~1`, `git clean -n` |
 | Download and run | `curl … \| bash`, `wget -qO- … \| sh`, `bash <(curl …)`, `iwr … \| iex`, `iex (…).DownloadString(…)` | `curl … \| jq .`, `iwr … -OutFile x.ps1` |
 | System files and security | `> /etc/passwd`, `crontab -r`, `reg delete HKLM\…`, `Set-ExecutionPolicy Unrestricted`, `Set-MpPreference -Disable… $true` | `cat /etc/passwd`, `crontab -l`, `Get-ExecutionPolicy` |
+| Wrapped or remote | `sudo -u root rm -rf /var/www`, `FOO=1 rm -rf build`, `bash -c 'rm -rf ~'`, `ssh prod 'sudo reboot'`, `cmd /c rd /s /q C:\temp`, `docker exec web rm -rf /data` | `sudo -u root ls /var/www`, `ssh prod uptime`, `docker exec web ls /data` |
 | Data and infrastructure | `DROP TABLE`, `TRUNCATE TABLE`, `redis-cli FLUSHALL`, `docker system prune`, `kubectl delete`, `terraform destroy` | `SELECT …`, `docker ps -a`, `terraform plan` |
 
 A flagged command is printed with the reason, e.g. `⚠ Deletes files recursively or without asking. Run it? [y/N]`. Anything other than `y`/`yes` (including Ctrl+D or a closed stdin) skips it. `-y/--yes` turns the prompt off for scripted use. With `--explain`, every command (flagged or not) is explained first and needs a confirmation.
 
-The rules live in `GUARD_RULES` in `opsh.py`. `tests/test_safety.py` pairs each destructive command with a similar everyday one (135 pairs: 79 bash, 12 zsh, 30 PowerShell, 14 cmd), so a rule that is too broad fails as loudly as one that is too narrow.
+The rules live in `GUARD_RULES` in `opsh.py`. `tests/test_safety.py` pairs each destructive command with a similar everyday one (155 pairs: 94 bash, 13 zsh, 33 PowerShell, 15 cmd), so a rule that is too broad fails as loudly as one that is too narrow.
 
 The guard is a seatbelt, not a sandbox: it lowers the risk but cannot prove a command is safe. Commands you type yourself run as typed.
 
@@ -189,7 +190,7 @@ flowchart LR
   HG -->|--copy| CB[copy_to_clipboard]
   HG -->|--explain| EX[explain_command + reasons]
   HG -->|--dry-run| U
-  HG --> G{explain_risk<br/>61 rules}
+  HG --> G{explain_risk<br/>63 rules}
   G -->|no reasons| S
   G -->|reasons| C[confirm y/N]
   C -->|y| S
@@ -203,7 +204,7 @@ flowchart LR
 ## Development
 
 ```bash
-python -m unittest discover -s tests          # 118 tests, stdlib only, no network or key
+python -m unittest discover -s tests          # 130 tests, stdlib only, no network or key
 python -m pip install "coverage[toml]" ruff mypy
 python -m coverage run -m unittest discover -s tests && python -m coverage report   # fails under 85%
 ruff check .
@@ -214,7 +215,7 @@ The suite is stdlib `unittest`. Every test runs against a temporary config, `.en
 
 | File | Covers |
 | :--- | :--- |
-| `tests/test_safety.py` | The guard table (135 pairs), reasons, and the confirmation prompt. |
+| `tests/test_safety.py` | The guard table (155 pairs), reasons, and the confirmation prompt. |
 | `tests/test_providers.py` | HTTP retries/backoff/`Retry-After`, key redaction, each provider's request and response shape, `build_provider`. |
 | `tests/test_core.py` | Classifier, shell detection, history and history file, settings, prompt building, clipboard, `cd`, `run_command`. |
 | `tests/test_cli.py` | Explain/dry-run/copy flow, first-run setup for every provider, REPL built-ins, update check, uninstall, flags, end-to-end runs. |

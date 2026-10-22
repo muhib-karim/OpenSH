@@ -16,8 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.0] - 2026-10-22
 
 ### Added
-- **Safety guard rebuilt as a rule table**: 61 rules, each with a plain-English reason that is shown in the prompt (`⚠ Deletes files recursively or without asking. Run it? [y/N]`). Rules match at command position (start of line, after `;` `&&` `||` `|`, inside `$(…)`, behind `sudo`/`xargs`/`find -exec`/`nohup`…), so `cat shutdown.log` no longer counts as a shutdown. New coverage: `find -delete`, `shred`, `wipefs`, partition tools, `diskutil erase*`, `Format-Volume`/`Clear-Disk`, `cipher /w`, `vssadmin delete shadows`, `bcdedit`, recursive `chmod`/`chown` on system folders, `icacls … Everyone`, `takeown /r`, named and PowerShell/batch fork bombs, `pkill -9`, `taskkill /f`, `systemctl poweroff`, `init 0`, `git push origin +branch`, `git branch -D`, `git filter-branch`, `git checkout -- .`, `wget | sh`, `curl | python`, `bash <(curl …)`, `sh -c "$(curl …)"`, `irm | iex`, `iex (…).DownloadString`, writes to `/etc`, `crontab -r`, `reg delete`, `Set-ExecutionPolicy Unrestricted`, Defender switches, `FLUSHALL`, `docker … prune`, `kubectl delete`, `terraform destroy`.
+- **Safety guard rebuilt as a rule table**: 63 rules, each with a plain-English reason that is shown in the prompt (`⚠ Deletes files recursively or without asking. Run it? [y/N]`). Rules match at command position (start of line, after `;` `&&` `||` `|`, inside `$(…)`, inside quotes and after `bash -c`/`cmd /c`/`powershell -Command`, after `ssh host` and `docker`/`kubectl exec`, behind `sudo -u x`/`VAR=value`/`timeout N`/`xargs`/`find -exec`…), so `cat shutdown.log` no longer counts as a shutdown while `sudo -u root rm -rf /var/www` still does. New coverage: `find -delete`, `shred`, `wipefs`, partition tools, `diskutil erase*`, `Format-Volume`/`Clear-Disk`, `cipher /w`, `vssadmin delete shadows`, `bcdedit`, recursive `chmod`/`chown` on system folders, `icacls … Everyone`, `takeown /r`, named and PowerShell/batch fork bombs, `pkill -9`, `taskkill /f`, `systemctl poweroff`, `init 0`, `git push origin +branch`, `git branch -D`, `git filter-branch`, `git checkout .`, `git -C repo push -f`, `xargs rm`, pipes into `Remove-Item`, `Clear-RecycleBin`, `wget | sh`, `curl | python`, `bash <(curl …)`, `sh -c "$(curl …)"`, `irm | iex`, `iex (…).DownloadString`, writes to `/etc`, `crontab -r`, `reg delete`, `Set-ExecutionPolicy Unrestricted`, Defender switches, `FLUSHALL`, `docker … prune`, `kubectl delete`, `terraform destroy`.
 - **Explain-before-run**: `-e/--explain` and the `!explain` toggle show a short model explanation of each command, then ask before running it.
+- `opsh -c` exits with the generated command's exit code (1 when it was skipped, 0 for a dry run).
 - **`-n/--dry-run`** and the `!dry-run` toggle: show commands, never run them.
 - **`--copy`** and `!copy`: copy the generated command with `clip`, `pbcopy`, `wl-copy`, `xclip` or `xsel`.
 - **Pluggable providers**: Groq, Gemini, any OpenAI-compatible endpoint (`base_url`, `model`, `api_key_env` in `config.json`), local Ollama (`OLLAMA_HOST`), and an offline `mock` provider (`OPENSH_MOCK_RESPONSE`). `!auth` sets up all of them. `--provider`/`--model` and `OPENSH_PROVIDER`/`OPENSH_MODEL`/`OPENSH_BASE_URL`/`OPENSH_TIMEOUT` override per run.
@@ -27,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--help` examples, `docs/opsh.1` man page.
 - CI: ruff, mypy, unittest under coverage with an 85% gate on Ubuntu/macOS/Windows × Python 3.10/3.12/3.13, gitleaks, CodeQL and Dependabot.
 - Release workflow runs the tests first, smoke-tests each PyInstaller binary with the offline provider, ships the man page and `SHA256SUMS.txt`, and builds (without publishing) on `upgrade/**` branches.
-- Test suite: 118 stdlib `unittest` tests (99% line coverage), including 135 table-driven destructive/benign guard pairs across bash, zsh, PowerShell and cmd, and end-to-end runs of the real script.
+- Test suite: 130 stdlib `unittest` tests (99% line coverage), including 155 table-driven destructive/benign guard pairs across bash, zsh, PowerShell and cmd, and end-to-end runs of the real script.
 - Landing page redesign, new README with guard table, provider configuration and architecture diagram, refreshed demo image.
 
 ### Changed
@@ -41,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests moved from pytest to the standard library's `unittest`.
 
 ### Fixed
+- Standalone (PyInstaller) binaries keep their settings next to the executable; they used a temporary folder, so settings were lost after every run.
+- Ctrl+C while waiting for the model cancels the request instead of retrying it.
+- A broken `config.json` is reported instead of being overwritten by first-run setup.
 - Output no longer crashes with `UnicodeEncodeError` when piped or on a legacy (cp1252) Windows console.
 - An unreadable or non-object `config.json` is treated as empty instead of crashing.
 - Update check only reports a release that is actually newer; provider requests send the current version in `User-Agent`; `!help` shows the right exit key per OS; bare `except:` clauses narrowed (all since 0.3.0).

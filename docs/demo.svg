@@ -15,9 +15,9 @@
 <text x="24" y="268"><tspan fill="#f5a524">→ du -sh */ | sort -rh</tspan></text>
 <text x="24" y="289"><tspan fill="#b9b0a0">(dry run - not executed)</tspan></text>
 <text x="24" y="331"><tspan fill="#5fd38d">$ </tspan><tspan fill="#f4efe6">python -m unittest discover -s tests</tspan></text>
-<text x="24" y="352"><tspan fill="#b9b0a0">Ran 118 tests in 0.8s</tspan></text>
+<text x="24" y="352"><tspan fill="#b9b0a0">Ran 130 tests in 0.9s</tspan></text>
 <text x="24" y="373"><tspan fill="#5fd38d">OK</tspan></text>
 <text x="24" y="394"><tspan fill="#5fd38d">$ </tspan><tspan fill="#f4efe6">coverage report</tspan></text>
-<text x="24" y="415"><tspan fill="#5fd38d">opsh.py    802 stmts    2 miss    99%</tspan></text>
+<text x="24" y="415"><tspan fill="#5fd38d">opsh.py    840 stmts    4 miss    99%</tspan></text>
 </g>
 </svg>

@@ -15,10 +15,11 @@ provider, regex safety guard before anything destructive runs. Single file `opsh
 - Never push to main; push only through the owner's gated push script. No local heavy builds.
 
 ## Status
-v0.4.0 on branch `upgrade/v0.4.0`: guard, providers, UX, unittest suite (117 tests, 99% coverage) and CI
-committed and pushed; waiting on first CI run.
+v0.4.0 complete on branch `upgrade/v0.4.0`: guard (63 rules, 155 test pairs), providers, UX, 130 unittest
+tests at 99% coverage, CI/CodeQL/release, docs. Code review findings fixed. Not merged or tagged.
 
 ## Next step
-Docs: README refresh, landing page, CHANGELOG [0.4.0], SKILLS_USED.md, HANDOFF.md; then CI green.
+Coordinator: open PR, merge, tag v0.4.0. Optional: render the archify diagram (TASKS.md).
 
 ## Session log
+2026-10-22 07:20Z Claude Code/claude-opus-5-5: v0.4.0 guard/providers/UX/tests/CI/docs, review fixes; next: PR + tag by coordinator.

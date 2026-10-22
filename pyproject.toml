@@ -1,0 +1,40 @@
+# Tool settings only. OpenSH is a single script (opsh.py) and is not packaged.
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP", "S", "PIE", "RUF"]
+ignore = [
+    "S602", "S603", "S607",  # running shell commands is what OpenSH is for
+    "S310",                  # urlopen on http(s) URLs is validated in build_provider
+    "RUF001",                # emoji / box-drawing characters in UI strings are intended
+    "UP006", "UP035", "UP045", # keep typing.Dict/List/Optional style used across the file
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106", "S107", "S108", "S604", "E501", "B023", "RUF059"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["opsh", "support"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["opsh.py"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+no_implicit_optional = true
+
+[tool.coverage.run]
+source = ["."]
+include = ["opsh.py"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+exclude_also = ["if __name__ == .__main__.:"]

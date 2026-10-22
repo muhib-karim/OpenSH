@@ -1,0 +1,109 @@
+.TH OPSH 1 "2026-10-22" "OpenSH 0.4.0" "User Commands"
+.SH NAME
+opsh \- talk to your terminal in plain English
+.SH SYNOPSIS
+.B opsh
+[\fB\-c\fR \fIrequest\fR...] [\fB\-n\fR] [\fB\-e\fR] [\fB\-y\fR] [\fB\-\-copy\fR]
+[\fB\-\-shell\fR \fIbash\fR|\fIzsh\fR|\fIpowershell\fR]
+[\fB\-\-provider\fR \fIname\fR] [\fB\-\-model\fR \fIname\fR] [\fB\-\-no\-history\fR]
+.SH DESCRIPTION
+.B opsh
+turns a plain-English request into one command for your shell (PowerShell, bash or zsh) using a
+language model, prints it, and runs it. Ordinary shell input such as \fBls\fR or \fBgit status\fR
+is recognised locally and runs without calling the model.
+.PP
+Before a generated command runs, a safety guard checks it against rules for recursive deletes,
+disk formatting, raw disk writes, permission changes on system folders, fork bombs, forced process
+kills, shutdown and reboot, git history rewrites, piping downloads into a shell, registry and
+security changes, and database or infrastructure deletion. Flagged commands are printed with the
+reason and only run after an explicit \fBy\fR.
+.SH OPTIONS
+.TP
+.BR \-c ", " \-\-command " " \fIrequest\fR...
+Handle one request and exit.
+.TP
+.BR \-n ", " \-\-dry\-run
+Print generated commands but never run them.
+.TP
+.BR \-e ", " \-\-explain
+Explain each generated command (and why the guard flagged it) and ask before running it.
+.TP
+.BR \-y ", " \-\-yes
+Run flagged commands without asking. Use with care.
+.TP
+.B \-\-copy
+Copy each generated command to the clipboard (clip, pbcopy, wl\-copy, xclip or xsel).
+.TP
+.B \-\-shell \fIbash\fR|\fIzsh\fR|\fIpowershell\fR
+Shell to generate commands for. Default: \fBOPENSH_SHELL\fR, then \fB$SHELL\fR, then the OS default.
+.TP
+.B \-\-provider \fIname\fR
+Provider for this session: groq, gemini, openai, ollama or mock.
+.TP
+.B \-\-model \fIname\fR
+Model for this session.
+.TP
+.B \-\-no\-history
+Do not read or write the history file.
+.TP
+.BR \-v ", " \-\-version
+Print the version.
+.SH INTERACTIVE COMMANDS
+.TP
+.B !explain\fR, \fB!dry\-run
+Toggle explain-before-run or dry run.
+.TP
+.B !copy
+Copy the last generated command.
+.TP
+.B !history
+Show recent input.
+.TP
+.B !auth
+Choose a provider and enter a key.
+.TP
+.B !\fIcommand\fR
+Run \fIcommand\fR as typed, without the model.
+.TP
+.B !version\fR, \fB!help\fR, \fB!credits\fR, \fB!uninstall\fR, \fBexit
+Info, removal and exit.
+.SH FILES
+.TP
+.I ~/.opsh/config.json
+Provider settings: \fBprovider\fR, and optionally \fBmodel\fR, \fBbase_url\fR, \fBapi_key_env\fR,
+\fBtimeout\fR, \fBretries\fR, \fBhistory\fR.
+.TP
+.I ~/.opsh/.env
+API keys (\fBGROQ_API_KEY\fR, \fBGEMINI_API_KEY\fR, \fBOPENAI_API_KEY\fR). Created with mode 600.
+.TP
+.I ~/.opsh/history
+Input history, at most 1000 lines. Lines that look like keys or passwords are not saved.
+.SH ENVIRONMENT
+.TP
+.B OPENSH_PROVIDER\fR, \fBOPENSH_MODEL\fR, \fBOPENSH_BASE_URL\fR, \fBOPENSH_TIMEOUT
+Override the provider settings for one run.
+.TP
+.B OPENSH_SHELL
+Shell to generate commands for.
+.TP
+.B OPENSH_HISTORY
+Path of the history file.
+.TP
+.B OPENSH_MOCK_RESPONSE
+With the mock provider, the command to return for every request.
+.TP
+.B OPENSH_NO_UPDATE_CHECK
+Skip the release check at start-up.
+.TP
+.B OLLAMA_HOST
+Ollama address (default http://localhost:11434).
+.SH EXAMPLES
+.nf
+opsh \-c "show my public ip address"
+opsh \-n \-c "delete all .tmp files"
+opsh \-e \-c "free up disk space"
+opsh \-\-provider ollama \-\-model llama3.2
+OPENSH_PROVIDER=mock opsh \-n \-c "list files"
+.fi
+.SH SEE ALSO
+Project page: https://github.com/muhib-karim/OpenSH

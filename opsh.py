@@ -1103,8 +1103,9 @@ def handle_generated(command: str, opts: RunOptions, ask: Optional[Callable[[str
             print(f"\033[36mℹ {explain_command(command)}\033[0m")
         except ProviderError as e:
             print(f"\033[90m(no explanation: {e})\033[0m")
-        for reason in reasons:
-            print(f"\033[31m⚠ {reason}\033[0m")
+        if opts.dry_run or opts.yes:  # otherwise the confirmation prompt shows the reasons
+            for reason in reasons:
+                print(f"\033[31m⚠ {reason}\033[0m")
     if opts.dry_run:
         print("\033[90m(dry run - not executed)\033[0m")
         return False

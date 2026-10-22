@@ -54,11 +54,18 @@ class HandleGenerated(IsolatedTestCase):
         run.assert_not_called()
         self.assertIn("dry run", out)
 
-    def test_explain_shows_explanation_and_reasons_then_asks(self):
+    def test_explain_shows_explanation_then_asks_with_reasons(self):
         self.use_mock_provider()
-        ran, out, run = self.run_handle("rm -rf build", answers("y"), explain=True)
+        prompts = []
+        ran, out, _ = self.run_handle("rm -rf build", lambda p: prompts.append(p) or "y", explain=True)
         self.assertTrue(ran)
         self.assertIn("Mock explanation", out)
+        self.assertNotIn("⚠", out)  # the reason is shown once, in the prompt
+        self.assertIn("Deletes files recursively", prompts[0])
+
+    def test_explain_prints_reasons_when_nothing_will_ask(self):
+        self.use_mock_provider()
+        _, out, _ = self.run_handle("rm -rf build", explain=True, dry_run=True)
         self.assertIn("⚠ Deletes files recursively", out)
 
     def test_explain_asks_even_for_safe_commands(self):

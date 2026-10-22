@@ -1,75 +1,104 @@
 name: Release
 
+# On a v* tag: test, build standalone binaries for Windows, Linux and macOS, smoke-test them and
+# publish a GitHub Release with SHA256 checksums. Pushes to upgrade/** branches run the same build
+# without publishing, so a broken build is caught before anything is tagged.
+
 on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'upgrade/**'
+    paths:
+      - opsh.py
+      - .github/workflows/release.yml
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 0.2.0)'
+        description: 'Version to release (e.g., 0.4.0)'
         required: true
 
+permissions:
+  contents: read
+
 jobs:
-  build-and-release:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Tests
+        run: python -m unittest discover -s tests -q
+
+  build:
     name: Build on ${{ matrix.os }}
+    needs: test
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
             artifact_name: opsh-windows
-            install_script: install.ps1
           - os: ubuntu-latest
             artifact_name: opsh-linux
-            install_script: install.sh
           - os: macos-latest
             artifact_name: opsh-macos
-            install_script: install.sh
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller
+      - name: Install PyInstaller
+        run: python -m pip install "pyinstaller>=6,<7"
 
-      - name: Create standalone executable (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          pyinstaller --onefile --name opsh opsh.py
-          mkdir -p dist/opsh-windows
-          cp dist/opsh.exe dist/opsh-windows/
-          cp install.ps1 dist/opsh-windows/
-          cp uninstall.ps1 dist/opsh-windows/
-          cp README.md dist/opsh-windows/
+      - name: Build standalone executable
+        run: pyinstaller --onefile --name opsh opsh.py
 
-      - name: Create standalone executable (Linux/macOS)
-        if: matrix.os != 'windows-latest'
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          OPENSH_PROVIDER: mock
+          OPENSH_NO_UPDATE_CHECK: '1'
+          PYTHONIOENCODING: utf-8
         run: |
-          pyinstaller --onefile --name opsh opsh.py
-          mkdir -p dist/${{ matrix.artifact_name }}
-          cp dist/opsh dist/${{ matrix.artifact_name }}/
-          cp install.sh dist/${{ matrix.artifact_name }}/
-          cp uninstall.sh dist/${{ matrix.artifact_name }}/
-          cp README.md dist/${{ matrix.artifact_name }}/
-          chmod +x dist/${{ matrix.artifact_name }}/opsh
-          chmod +x dist/${{ matrix.artifact_name }}/install.sh
+          ./dist/opsh.exe --version
+          ./dist/opsh.exe -n -c "list files"
 
-      - name: Create archive (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Smoke test (Linux/macOS)
+        if: runner.os != 'Windows'
+        env:
+          OPENSH_PROVIDER: mock
+          OPENSH_NO_UPDATE_CHECK: '1'
         run: |
+          ./dist/opsh --version
+          ./dist/opsh -n -c "list files"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/opsh-windows | Out-Null
+          Copy-Item dist/opsh.exe, install.ps1, uninstall.ps1, README.md, LICENSE, docs/opsh.1 dist/opsh-windows/
           Compress-Archive -Path dist/opsh-windows/* -DestinationPath opsh-windows.zip
 
-      - name: Create archive (Linux/macOS)
-        if: matrix.os != 'windows-latest'
+      - name: Package (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
+          mkdir -p dist/${{ matrix.artifact_name }}
+          cp dist/opsh install.sh uninstall.sh README.md LICENSE docs/opsh.1 dist/${{ matrix.artifact_name }}/
+          chmod +x dist/${{ matrix.artifact_name }}/opsh dist/${{ matrix.artifact_name }}/install.sh
           cd dist && tar -czvf ../${{ matrix.artifact_name }}.tar.gz ${{ matrix.artifact_name }}
 
       - name: Upload artifact
@@ -80,10 +109,12 @@ jobs:
             opsh-windows.zip
             opsh-linux.tar.gz
             opsh-macos.tar.gz
+          if-no-files-found: error
 
   create-release:
     name: Create GitHub Release
-    needs: build-and-release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -95,17 +126,25 @@ jobs:
         with:
           path: artifacts
 
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum */*.zip */*.tar.gz | sed 's#  [^/]*/#  #' > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Get version
         id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "version=${INPUT_VERSION#v}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: OpenSH v${{ steps.version.outputs.version }}
           tag_name: v${{ steps.version.outputs.version }}
@@ -116,5 +155,4 @@ jobs:
             artifacts/opsh-windows/*.zip
             artifacts/opsh-linux/*.tar.gz
             artifacts/opsh-macos/*.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            artifacts/SHA256SUMS.txt

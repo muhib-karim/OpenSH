@@ -2,14 +2,36 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install tools
+        run: python -m pip install ruff==0.17.1 mypy==2.4.0
+
+      - name: Ruff
+        run: ruff check --output-format=github .
+
+      - name: Mypy
+        run: mypy
+
   test:
     name: Test on ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -17,7 +39,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.9', '3.11', '3.12']
+        python-version: ['3.10', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -27,33 +49,30 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Install coverage (tests themselves are stdlib only)
+        run: python -m pip install "coverage[toml]>=7.6"
+
+      - name: Syntax and version check
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pytest
+          python -m py_compile opsh.py
+          python opsh.py --version
 
-      - name: Syntax check
-        run: python -m py_compile opsh.py
+      - name: Unit tests with coverage
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python -m coverage run -m unittest discover -s tests -v
 
-      - name: Version check
-        run: python opsh.py --version
+      - name: Coverage report (fails under 85%)
+        run: python -m coverage report
 
-      - name: Unit tests
-        run: python -m pytest -q tests
-
-  lint:
-    name: Lint
+  gitleaks:
+    name: Secret scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          fetch-depth: 0
 
-      - name: Install ruff
-        run: python -m pip install ruff==0.17.0
-
-      - name: Ruff (syntax errors and undefined names)
-        run: ruff check --select E9,F63,F7,F82 opsh.py tests
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -9,7 +9,7 @@ Checklist for the v0.4.0 upgrade (branch `upgrade/v0.4.0`). Ticked items are don
 - [x] CI: ruff, mypy, coverage matrix, gitleaks, CodeQL, Dependabot; release workflow on tag
 - [x] README + landing page refresh, CHANGELOG [0.4.0], version bump, SKILLS_USED.md, HANDOFF.md
 - [x] Independent code review; critical/important/minor findings fixed (see HANDOFF.md)
-- [ ] Pushed via push script, CI green on branch head (final push of this branch)
+- [x] Pushed via push script, CI green on branch head
 
 ## Blocked / notes
 - **Archify HTML render**: `docs/architecture/opsh-flow.archify.json` passes archify validate, deliver and strict

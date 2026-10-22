@@ -330,6 +330,14 @@ class Main(IsolatedTestCase):
             self.capture(opsh.main, ["--no-history"])
         self.assertEqual(repl.call_args[0][1], False)
 
+    def test_safe_output_switches_streams_to_replace(self):
+        stream = mock.Mock()
+        broken = mock.Mock()
+        broken.reconfigure.side_effect = ValueError
+        with mock.patch.object(opsh.sys, "stdout", stream), mock.patch.object(opsh.sys, "stderr", broken):
+            opsh._safe_output()
+        stream.reconfigure.assert_called_once_with(errors="replace")
+
     def test_help_has_examples(self):
         help_text = opsh.build_parser().format_help()
         for flag in ["--dry-run", "--explain", "--copy", "--shell", "--provider", "examples:"]:

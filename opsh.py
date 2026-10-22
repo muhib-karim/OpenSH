@@ -1307,8 +1307,20 @@ def repl(opts: RunOptions, history_enabled: bool = True) -> int:
             print(f"\033[31mError: {str(e)[:200]}\033[0m")
 
 
+def _safe_output() -> None:
+    """Never crash on emoji when output goes to a pipe or a legacy (cp1252) console."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     global PLATFORM
+    _safe_output()
     args = build_parser().parse_args(argv)
     load_env()
     if args.shell:

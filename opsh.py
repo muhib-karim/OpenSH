@@ -849,11 +849,20 @@ def is_natural_language(text: str) -> bool:
 # an explicit "y" first. Rules match at command position (start of line, after ; && || |
 # ( { or `, behind sudo/xargs/-exec and friends), so `cat shutdown.log` is not a shutdown.
 
-_START = r"(?:^|[;&|({`\n]|\$\(|-exec(?:dir)?\s|\b(?:then|do|else)\s)\s*"
-_WRAP = r"(?:(?:sudo|doas|command|exec|nohup|nice|time|env|noglob|builtin|xargs)\b(?:\s+-\S+)*\s+)*"
+_OPT = r"-\S+(?:\s+[^\s;&|-][^\s;&|]*)?"  # an option, maybe with a value (-u root, -n 10)
+_START = (r"(?:^|[;&|({`\n'\"]|\$\(|-exec(?:dir)?\s|\b(?:then|do|else)\s"
+          r"|\s(?:-c|/c|/k|-command)\s"                                   # bash -c, cmd /c, powershell -Command
+          r"|\b(?:ssh|mosh)\s+(?:" + _OPT + r"\s+)*[^\s;&|-]\S*\s"          # ssh [opts] host CMD
+          r"|\b(?:docker|podman|kubectl|oc)\s+exec\s+(?:" + _OPT + r"\s+)*[^\s;&|-]\S*\s+(?:--\s)?"
+          r")\s*")
+_WRAP = (r"(?:(?:[A-Za-z_]\w*=\S*"                                           # FOO=1 cmd
+         r"|(?:sudo|doas|command|exec|nohup|nice|time|timeout|env|noglob|builtin|xargs|watch|stdbuf|ionice)\b"
+         r"(?:\s+" + _OPT + r")*(?:\s+\d[\w.]*)?"                              # timeout 5, nice -n 10
+         r")\s+)*")
+_GIT = r"git\s+(?:" + _OPT + r"\s+)*"  # git -C repo ...
 _CMD = _START + _WRAP + r"(?:[\w./~-]*/|\\)?"
 _ARGS = r"[^;&|\n]*"  # rest of the same simple command
-_END = r"(?=\s|$|[;&|)])"
+_END = r"(?=\s|$|[;&|)]|['\"]\s*(?:$|[;&|)]))"  # word ends here (a closing quote counts)
 _ROOTISH = (r"(?:/|~|\$HOME|/(?:etc|usr|bin|sbin|boot|var|lib|lib64|home|root|opt|dev|proc|sys|"
             r"system|library|applications|users)|[a-z]:\\(?:windows)?)/?" + _END)
 _SHELLS = r"(?:ba|z|da|k|fi|c|tc)?sh"
@@ -867,6 +876,10 @@ GUARD_RULES: List[Tuple[str, str]] = [
     ("Deletes folders and their contents (cmd /s /q /f)",
      _CMD + r"(?:rmdir|rd|del|erase)\b" + _ARGS + r"\s/[sfq]\b"),
     ("Deletes every file find matches", _CMD + r"find\b" + _ARGS + r"\s-delete\b"),
+    ("Deletes every file piped or passed into it",
+     r"\bxargs\b(?:\s+" + _OPT + r")*\s+rm\b|-exec(?:dir)?\s+rm\b"
+     r"|\|\s*(?:remove-item|ri|del|erase|rm)\b(?!\s+-whatif)"),
+    ("Empties the Recycle Bin", _CMD + r"clear-recyclebin\b"),
     ("Overwrites files so they cannot be recovered", _CMD + r"(?:shred|srm)\b"),
     ("Moves data into /dev/null (deletes it)", _CMD + r"mv\b" + _ARGS + r"\s/dev/null\b"),
     ("Empties a file", _CMD + r"truncate\s+(?:-\S+\s+)*-s\s*0\b"),
@@ -911,15 +924,15 @@ GUARD_RULES: List[Tuple[str, str]] = [
     ("Shuts down or restarts the machine", _CMD + r"(?:stop|restart)-computer\b"),
     # Git history
     ("Overwrites remote git history (force push)",
-     _CMD + r"git\s+(?:-\S+\s+)*push\b" + _ARGS
+     _CMD + _GIT + r"push\b" + _ARGS
      + r"\s(?:--force(?:-with-lease)?(?:=\S*)?|-[a-z]*f[a-z]*|\+\S+)" + _END),
-    ("Discards uncommitted git changes", _CMD + r"git\s+(?:-\S+\s+)*reset\b" + _ARGS + r"\s--hard\b"),
-    ("Deletes untracked files", _CMD + r"git\s+(?:-\S+\s+)*clean\b" + _ARGS + r"\s(?:-[a-z]*f|--force)"),
-    ("Deletes an unmerged git branch", _CMD + r"git\s+(?:-\S+\s+)*branch\b" + _ARGS + r"\s(?-i:-D)\b"),
+    ("Discards uncommitted git changes", _CMD + _GIT + r"reset\b" + _ARGS + r"\s--hard\b"),
+    ("Deletes untracked files", _CMD + _GIT + r"clean\b" + _ARGS + r"\s(?:-[a-z]*f|--force)"),
+    ("Deletes an unmerged git branch", _CMD + _GIT + r"branch\b" + _ARGS + r"\s(?-i:-D)\b"),
     ("Rewrites or erases git history",
-     _CMD + r"git\s+(?:-\S+\s+)*(?:filter-branch|filter-repo|reflog\s+expire|stash\s+clear|update-ref\s+-d)\b"),
+     _CMD + _GIT + r"(?:filter-branch|filter-repo|reflog\s+expire|stash\s+clear|update-ref\s+-d)\b"),
     ("Discards uncommitted git changes",
-     _CMD + r"git\s+(?:-\S+\s+)*(?:checkout\s+(?:\S+\s+)?--\s+\.|restore\s+(?:--?\S+\s+)*\.)" + _END),
+     _CMD + _GIT + r"(?:checkout\s+(?:(?:\S+\s+)?--\s+)?\.|restore\s+(?:--?\S+\s+)*\.)" + _END),
     # Running code straight from the internet
     ("Runs a script downloaded from the internet",
      r"\b(?:curl|wget|fetch|iwr|irm|invoke-webrequest|invoke-restmethod)\b" + _ARGS + r"\|\s*"

@@ -4,6 +4,7 @@ Every row pairs a command the guard must flag with a similar everyday command it
 leave alone, so a pattern that is too broad fails just as loudly as one that is too narrow.
 """
 
+import time
 import unittest
 
 from support import opsh
@@ -155,6 +156,27 @@ PAIRS = [
     ("bash", "kubectl delete namespace prod", "kubectl get namespace prod"),
     ("bash", "terraform destroy -auto-approve", "terraform plan"),
     ("powershell", "docker image prune -a --force", "docker image ls"),
+    # --- wrapped commands: sudo/env options, assignments, nested and remote shells ---------
+    ("bash", "sudo -u root rm -rf /var/www", "sudo -u root ls /var/www"),
+    ("bash", "sudo -u www-data git reset --hard", "sudo -u www-data git status"),
+    ("bash", "env FOO=1 rm -rf build", "env FOO=1 make build"),
+    ("bash", "FOO=1 rm -rf build", "FOO=1 make build"),
+    ("bash", "GIT_DIR=x git push --force", "GIT_DIR=x git push"),
+    ("bash", "nice -n 10 rm -rf /srv/cache", "nice -n 10 tar czf a.tgz src"),
+    ("bash", "timeout 5 rm -rf ~", "timeout 5 ping -c 1 example.com"),
+    ("bash", "bash -c 'rm -rf ~'", "bash -c 'ls ~'"),
+    ("zsh", 'zsh -c "sudo reboot"', 'zsh -c "uptime"'),
+    ("bash", "ssh host 'rm -rf /var/www'", "ssh host 'ls /var/www'"),
+    ("bash", "ssh -i key.pem prod sudo reboot", "ssh -i key.pem prod uptime"),
+    ("bash", "docker exec c rm -rf /data", "docker exec c ls /data"),
+    ("bash", "kubectl exec -it pod -- rm -rf /tmp/x", "kubectl exec -it pod -- ls /tmp"),
+    ("bash", "git -C repo push -f", "git -C repo push"),
+    ("bash", "git checkout .", "git checkout main"),
+    ("bash", "find . -name '*.log' | xargs rm", "find . -name '*.log' | xargs wc -l"),
+    ("cmd", "cmd /c rd /s /q C:\\temp", "cmd /c dir C:\\temp"),
+    ("powershell", 'powershell -Command "Remove-Item -Recurse -Force C:\\x"', 'powershell -Command "Get-ChildItem C:\\x"'),
+    ("powershell", "Get-ChildItem *.tmp | Remove-Item", "Get-ChildItem *.tmp | Select-Object Name"),
+    ("powershell", "Clear-RecycleBin -Force", "Get-PSDrive"),
 ]
 
 
@@ -185,6 +207,12 @@ class GuardTable(unittest.TestCase):
         for cmd in ("", "   ", "\n"):
             self.assertFalse(opsh.is_destructive(cmd))
             self.assertEqual(opsh.explain_risk(cmd), [])
+
+    def test_long_input_is_checked_quickly(self):
+        cmd = "sudo " + "-x y " * 400 + "ls " + "a " * 2000
+        start = time.perf_counter()
+        opsh.explain_risk(cmd)
+        self.assertLess(time.perf_counter() - start, 1.0)
 
     def test_reasons_are_deduplicated(self):
         reasons = opsh.explain_risk("rm -rf a; rm -rf b")

@@ -1,498 +1,337 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenSH - Natural Language Shell</title>
-    <meta name="description"
-        content="Talk to your terminal in plain English. Works on Windows, macOS, and Linux. Free & Open Source.">
-    <meta property="og:title" content="OpenSH - AI Shell Assistant">
-    <meta property="og:description" content="Forget memorizing commands. Just say what you want.">
-    <meta property="og:image" content="https://opensh.vercel.app/og-image.png">
-    <meta property="og:url" content="https://opensh.vercel.app">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenSH: talk to your terminal in plain English</title>
+<meta name="description" content="OpenSH turns plain English into one PowerShell, bash or zsh command, shows it, and holds back anything destructive until you say yes. One Python file, bring your own model.">
+<meta property="og:title" content="OpenSH: talk to your terminal in plain English">
+<meta property="og:description" content="Plain English in, one shell command out, with a safety guard in between.">
+<meta property="og:url" content="https://opensh.vercel.app">
+<meta name="theme-color" content="#0b0a08">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0a08;
+    --surface: #14120e;
+    --surface-2: #1c1914;
+    --line: #2e2a22;
+    --text: #f4efe6;
+    --text-2: #b9b0a0;
+    --text-3: #8f8676;
+    --amber: #f5a524;
+    --amber-soft: #f5a52422;
+    --green: #5fd38d;
+    --red: #ff6b5e;
+    --cyan: #6cc7d9;
+    --radius: 10px;
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scrollbar-color: var(--line) var(--bg); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 17px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--amber); color: var(--bg); }
+  a { color: var(--amber); text-underline-offset: 3px; }
+  a:hover { color: var(--text); }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+  code, kbd, pre { font-family: var(--mono); font-size: 0.88em; }
+  :not(pre) > code { background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 4px; color: var(--text); }
+  .wrap { width: min(1080px, 100% - 40px); margin-inline: auto; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--amber); color: var(--bg); padding: 8px 12px; }
+  .skip:focus { left: 8px; }
+  .skip:hover, .skip:focus { color: var(--bg); }
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
+  /* nav */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 700; font-size: 1.05rem; }
+  .brand img { width: 28px; height: 28px; }
+  .version { font: 500 0.75rem var(--mono); color: var(--amber); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+  .nav-links { display: flex; gap: 22px; align-items: center; }
+  .nav-links a { color: var(--text-2); text-decoration: none; font-size: 0.95rem; }
+  .nav-links a:hover { color: var(--text); }
 
-    <style>
-        :root {
-            /* Caffeine Theme Variables */
-            --background: 0 0% 4%;
-            --foreground: 0 0% 98%;
+  /* hero */
+  header.hero { display: grid; grid-template-columns: 1fr 1.15fr; gap: 56px; align-items: center; padding: 56px 0 88px; }
+  h1 { font-size: clamp(2.4rem, 5.2vw, 4rem); line-height: 1.04; letter-spacing: -0.035em; margin: 0 0 22px; font-weight: 700; text-wrap: balance; }
+  h1 em { font-style: normal; color: var(--amber); }
+  h1 .nw { display: inline-block; }
+  .lede { color: var(--text-2); font-size: 1.15rem; max-width: 34ch; margin: 0 0 32px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 20px;
+    border-radius: 8px; font: 600 0.95rem var(--sans); text-decoration: none; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+    transition: background-color .2s, border-color .2s, transform .2s cubic-bezier(.16,1,.3,1);
+  }
+  .btn:hover { border-color: var(--text-3); color: var(--text); }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--amber); border-color: var(--amber); color: #1a1205; }
+  .btn-primary:hover { background: #ffb940; border-color: #ffb940; color: #1a1205; }
+  .btn svg { width: 18px; height: 18px; }
 
-            --card: 0 0% 4%;
-            --card-foreground: 0 0% 98%;
+  /* terminal */
+  .term { background: #0f0d0a; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 24px 60px -20px #000c, 0 2px 0 #ffffff08 inset; overflow: hidden; }
+  .term-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .term-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+  .term-bar span { margin-left: 8px; font: 0.78rem var(--mono); color: var(--text-3); }
+  .term pre { margin: 0; padding: 20px 20px 24px; font-size: 0.86rem; line-height: 1.75; white-space: pre-wrap; word-break: break-word; color: var(--text-2); }
+  .t-cwd { color: var(--green); }
+  .t-in { color: var(--text); }
+  .t-cmd { color: var(--amber); }
+  .t-warn { color: var(--red); }
+  .t-info { color: var(--cyan); }
+  .t-dim { color: var(--text-3); }
+  .line { display: block; }
+  @media (prefers-reduced-motion: no-preference) {
+    .js .term .line { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+    .js .term .line.shown { opacity: 1; transform: none; filter: none; transition: opacity .45s cubic-bezier(.16,1,.3,1), transform .45s cubic-bezier(.16,1,.3,1), filter .45s; }
+  }
 
-            --popover: 0 0% 4%;
-            --popover-foreground: 0 0% 98%;
+  /* sections */
+  section { padding: 80px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: clamp(1.7rem, 3vw, 2.3rem); letter-spacing: -0.025em; line-height: 1.15; margin: 0 0 14px; text-wrap: balance; }
+  .intro { color: var(--text-2); max-width: 62ch; margin: 0 0 40px; }
+  .split { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 56px; align-items: start; }
 
-            --primary: 38 92% 50%;
-            /* Amber/Gold caffeine color */
-            --primary-foreground: 0 0% 9%;
+  /* how it works */
+  ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 28px; }
+  ol.steps li { display: grid; grid-template-columns: 40px 1fr; gap: 16px; }
+  ol.steps svg { width: 24px; height: 24px; color: var(--amber); margin-top: 3px; }
+  ol.steps h3 { margin: 0 0 4px; font-size: 1.05rem; }
+  ol.steps p { margin: 0; color: var(--text-2); }
 
-            --secondary: 0 0% 9%;
-            --secondary-foreground: 0 0% 98%;
+  /* install tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 0; }
+  .tab { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-2); font: 500 0.95rem var(--sans); padding: 12px 16px; min-height: 44px; cursor: pointer; margin-bottom: -1px; }
+  .tab:hover { color: var(--text); }
+  .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--amber); }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius) var(--radius); padding: 20px; }
+  .panel[hidden] { display: none; }
+  .cmdline { display: flex; align-items: center; gap: 12px; background: #0f0d0a; border: 1px solid var(--line); border-radius: 8px; padding: 12px 12px 12px 16px; }
+  .cmdline code { flex: 1; overflow-x: auto; white-space: nowrap; color: var(--text); font-size: 0.86rem; background: none; padding: 0; }
+  .copy { flex: none; min-height: 36px; padding: 0 12px; font-size: 0.85rem; }
+  .panel p { margin: 14px 0 0; color: var(--text-2); font-size: 0.95rem; }
 
-            --muted: 0 0% 9%;
-            --muted-foreground: 0 0% 63.9%;
+  /* guard table */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--text-3); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; background: var(--surface); }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+  td.held code { color: var(--red); background: #ff6b5e14; }
+  td.ok code { color: var(--green); background: #5fd38d14; }
+  .note { color: var(--text-3); font-size: 0.92rem; margin-top: 16px; max-width: 70ch; }
 
-            --accent: 0 0% 9%;
-            --accent-foreground: 0 0% 98%;
+  /* providers */
+  dl.providers { margin: 0; display: grid; grid-template-columns: max-content 1fr; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  dl.providers dt, dl.providers dd { margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  dl.providers dt { font: 600 0.95rem var(--mono); color: var(--amber); background: var(--surface); }
+  dl.providers dd { color: var(--text-2); }
+  dl.providers dt:last-of-type, dl.providers dd:last-of-type { border-bottom: 0; }
 
-            --destructive: 0 62.8% 30.6%;
-            --destructive-foreground: 0 0% 98%;
+  footer { border-top: 1px solid var(--line); padding: 40px 0 56px; color: var(--text-3); font-size: 0.92rem; }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
+  footer a { color: var(--text-2); }
 
-            --border: 0 0% 14.9%;
-            --input: 0 0% 14.9%;
-            --ring: 0 0% 14.9%;
-
-            --radius: 0.75rem;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Geist', sans-serif;
-            background-color: hsl(var(--background));
-            color: hsl(var(--foreground));
-            line-height: 1.6;
-            overflow-x: hidden;
-            background-image: radial-gradient(circle at 50% -20%, hsl(var(--primary) / 0.15), transparent 60%);
-        }
-
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 0 1.5rem;
-        }
-
-        /* Navbar */
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 2rem 0;
-        }
-
-        .brand {
-            font-weight: 700;
-            font-size: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            text-decoration: none;
-            color: hsl(var(--foreground));
-            letter-spacing: -0.02em;
-        }
-
-        .version-badge {
-            font-size: 0.75rem;
-            background: hsl(var(--secondary));
-            color: hsl(var(--primary));
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-family: 'JetBrains Mono', monospace;
-            border: 1px solid hsl(var(--border));
-        }
-
-        /* Hero */
-        header {
-            padding: 6rem 0 4rem;
-            text-align: center;
-        }
-
-        h1 {
-            font-size: clamp(3rem, 7vw, 5rem);
-            font-weight: 800;
-            line-height: 1;
-            letter-spacing: -0.04em;
-            margin-bottom: 2rem;
-            color: hsl(var(--foreground));
-        }
-
-        .text-caffeine {
-            color: hsl(var(--primary));
-        }
-
-        .subtitle {
-            font-size: 1.25rem;
-            color: hsl(var(--muted-foreground));
-            max-width: 550px;
-            margin: 0 auto 3rem;
-        }
-
-        /* Terminal Card */
-        .terminal-container {
-            margin: 0 auto 5rem;
-            max-width: 800px;
-            border-radius: var(--radius);
-            background: hsl(0 0% 7%);
-            border: 1px solid hsl(var(--border));
-            box-shadow: 0 20px 40px -10px black;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .terminal-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.5), transparent);
-        }
-
-        .terminal-header {
-            padding: 0.75rem 1rem;
-            display: flex;
-            gap: 0.5rem;
-            border-bottom: 1px solid hsl(var(--border));
-            background: hsl(0 0% 5%);
-        }
-
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            opacity: 0.5;
-        }
-
-        .red {
-            background: #fee2e2;
-        }
-
-        .yellow {
-            background: #fef3c7;
-        }
-
-        .green {
-            background: #dcfce7;
-        }
-
-        .terminal-content {
-            padding: 1.5rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.95rem;
-            text-align: left;
-        }
-
-        .prompt {
-            color: hsl(var(--muted-foreground));
-            user-select: none;
-        }
-
-        .input {
-            color: hsl(var(--foreground));
-            font-weight: 600;
-        }
-
-        .output {
-            color: hsl(var(--primary));
-            margin-top: 0.75rem;
-            display: block;
-        }
-
-        .result {
-            color: hsl(var(--muted-foreground));
-            margin-top: 0.25rem;
-            display: block;
-            opacity: 0.8;
-        }
-
-        /* Actions */
-        .cta-group {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            margin-bottom: 4rem;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            height: 3rem;
-            padding: 0 1.5rem;
-            border-radius: var(--radius);
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s;
-            font-size: 0.95rem;
-            cursor: pointer;
-            border: none;
-        }
-
-        .btn-primary {
-            background: hsl(var(--primary));
-            color: hsl(var(--primary-foreground));
-        }
-
-        .btn-primary:hover {
-            filter: brightness(1.1);
-            transform: translateY(-1px);
-        }
-
-        .btn-secondary {
-            background: hsl(var(--secondary));
-            color: hsl(var(--secondary-foreground));
-            border: 1px solid hsl(var(--border));
-        }
-
-        .btn-secondary:hover {
-            background: hsl(var(--border));
-        }
-
-        /* Install Block */
-        .install-block {
-            background: hsl(0 0% 6%);
-            border: 1px solid hsl(var(--border));
-            border-radius: var(--radius);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            position: relative;
-        }
-
-        .tabs {
-            position: absolute;
-            top: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: hsl(var(--background));
-            padding: 0 1rem;
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .pill {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            border: 1px solid hsl(var(--border));
-            cursor: pointer;
-            color: hsl(var(--muted-foreground));
-            background: hsl(var(--card));
-            transition: all 0.2s;
-        }
-
-        .pill.active {
-            border-color: hsl(var(--primary));
-            color: hsl(var(--primary));
-        }
-
-        .command {
-            font-family: 'JetBrains Mono', monospace;
-            color: hsl(var(--foreground));
-            word-break: break-all;
-            display: none;
-        }
-
-        .command.active {
-            display: block;
-        }
-
-        /* Features */
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            padding: 4rem 0;
-        }
-
-        .feature {
-            padding: 2rem;
-            border: 1px solid hsl(var(--border));
-            background: hsl(var(--card));
-            border-radius: var(--radius);
-            transition: border-color 0.2s;
-        }
-
-        .feature:hover {
-            border-color: hsl(var(--primary));
-        }
-
-        .feature h3 {
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: hsl(var(--foreground));
-        }
-
-        .feature p {
-            font-size: 0.95rem;
-            color: hsl(var(--muted-foreground));
-        }
-
-        .icon {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-            display: block;
-        }
-
-        /* Footer */
-        footer {
-            border-top: 1px solid hsl(var(--border));
-            padding: 3rem 0;
-            text-align: center;
-            margin-top: 4rem;
-        }
-
-        .kofi-highlight {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
-            background: #FF5E5B;
-            color: white;
-            padding: 0.75rem 2rem;
-            border-radius: 50px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: transform 0.2s;
-            box-shadow: 0 0 20px rgba(255, 94, 91, 0.3);
-        }
-
-        .kofi-highlight:hover {
-            transform: scale(1.05);
-        }
-    </style>
+  @media (max-width: 860px) {
+    header.hero, .split { grid-template-columns: 1fr; gap: 40px; }
+    header.hero { padding-top: 24px; }
+    .nav-links a.hide-sm { display: none; }
+    section { padding: 64px 0; }
+  }
+  @media (max-width: 520px) {
+    body { font-size: 16px; }
+    dl.providers { grid-template-columns: 1fr; }
+    dl.providers dt { border-bottom: 0; padding-bottom: 4px; }
+    .term pre { font-size: 0.8rem; padding: 16px; }
+  }
+</style>
 </head>
-
 <body>
-    <nav class="container">
-        <a href="#" class="brand">
-            🚀 OpenSH
-            <span class="version-badge">v0.2.1</span>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <nav aria-label="Main">
+    <a href="#" class="brand"><img src="assets/logo.svg" alt="" width="28" height="28">OpenSH <span class="version">v0.4.0</span></a>
+    <div class="nav-links">
+      <a class="hide-sm" href="#safety">Safety</a>
+      <a class="hide-sm" href="#providers">Providers</a>
+      <a href="https://github.com/muhib-karim/OpenSH">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <h1><span class="nw">Say what you want.</span> <em class="nw">Read it.</em> <span class="nw">Then run it.</span></h1>
+      <p class="lede">OpenSH turns plain English into one PowerShell, bash or zsh command, shows it to you, and holds back anything destructive until you type <kbd>y</kbd>.</p>
+      <div class="actions">
+        <a href="#install" class="btn btn-primary">Install</a>
+        <a href="https://github.com/muhib-karim/OpenSH#readme" class="btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2.5Z"/><path d="M8 7h6"/></svg>
+          Read the docs
         </a>
-        <a href="https://github.com/muhib-karim/OpenSH" target="_blank" class="btn btn-secondary"
-            style="height: 2.5rem; font-size: 0.85rem;">
-            GitHub
-        </a>
-    </nav>
+      </div>
+    </div>
+    <div class="term" role="img" aria-label="Terminal: OpenSH explains a generated cleanup command, flags it as a recursive delete and skips it because the user answered no.">
+      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>opsh --explain</span></div>
+<pre aria-hidden="true"><span class="line"><span class="t-cwd">~/projects/site</span> &gt; <span class="t-in">find the biggest files in downloads</span></span><span class="line"><span class="t-cmd">→ du -ah ~/Downloads | sort -rh | head -n 10</span></span><span class="line"><span class="t-info">ℹ Lists the 10 largest files and folders in Downloads. Changes nothing.</span></span><span class="line"><span class="t-dim">Run it? [Y/n]</span> y</span><span class="line">2.1G  /home/me/Downloads/ubuntu.iso</span><span class="line"><span class="t-cwd">~/projects/site</span> &gt; <span class="t-in">clear out the build cache</span></span><span class="line"><span class="t-cmd">→ rm -rf .cache dist</span></span><span class="line"><span class="t-warn">⚠ Deletes files recursively or without asking. Run it? [y/N]</span> n</span><span class="line"><span class="t-dim">Skipped.</span></span></pre>
+    </div>
+  </header>
+</div>
 
-    <header class="container">
-        <h1>
-            Your Terminal,<br>
-            <span class="text-caffeine">Caffeinated.</span>
-        </h1>
-        <p class="subtitle">
-            The natural language shell that wakes up your command line. Talk to it in plain English. Interactive, safe,
-            and natively cross-platform.
-        </p>
+<main id="main">
+  <section aria-labelledby="how">
+    <div class="wrap split">
+      <div>
+        <h2 id="how">One file. Your model. Your shell.</h2>
+        <p class="intro">OpenSH is a single Python file that uses only the standard library. Ordinary input such as <code>git status</code> runs as typed with no API call; English goes to the model you picked.</p>
+      </div>
+      <ol class="steps">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-5-6-5"/><path d="M12 19h8"/></svg>
+          <div><h3>Shell auto-detected</h3><p>PowerShell on Windows, zsh or bash from <code>$SHELL</code> elsewhere. Override with <code>--shell</code>.</p></div>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          <div><h3>Explain before run</h3><p><code>--explain</code> shows what a command does and why it was flagged, then asks. <code>--dry-run</code> never runs anything.</p></div>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+          <div><h3>Copy and history</h3><p><code>--copy</code> puts the command on your clipboard; input history survives restarts and never stores lines that look like keys.</p></div>
+        </li>
+      </ol>
+    </div>
+  </section>
 
-        <div class="cta-group">
-            <a href="#install" class="btn btn-primary">Get Started</a>
-            <a href="https://github.com/muhib-karim/OpenSH" class="btn btn-secondary">Documentation</a>
-        </div>
+  <section id="install" aria-labelledby="install-h">
+    <div class="wrap">
+      <h2 id="install-h">Install</h2>
+      <p class="intro">Needs Python 3.10 or newer. The installer puts OpenSH in <code>~/.opsh</code> and adds <code>opsh</code> to your PATH. Prefer a binary? Grab one from the <a href="https://github.com/muhib-karim/OpenSH/releases/latest">latest release</a>.</p>
+      <div class="tabs" role="tablist" aria-label="Operating system">
+        <button class="tab" role="tab" id="tab-win" aria-controls="panel-win" aria-selected="true">Windows</button>
+        <button class="tab" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false" tabindex="-1">macOS</button>
+        <button class="tab" role="tab" id="tab-linux" aria-controls="panel-linux" aria-selected="false" tabindex="-1">Linux</button>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-win" aria-labelledby="tab-win">
+        <div class="cmdline"><code>irm https://raw.githubusercontent.com/muhib-karim/OpenSH/main/install.ps1 | iex</code><button class="btn copy" type="button">Copy</button></div>
+        <p>Run in PowerShell. Add <code>pyreadline3</code> for arrow-key history.</p>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-mac" aria-labelledby="tab-mac" hidden>
+        <div class="cmdline"><code>curl -fsSL https://raw.githubusercontent.com/muhib-karim/OpenSH/main/install.sh | bash</code><button class="btn copy" type="button">Copy</button></div>
+        <p>Commands are generated for zsh unless your login shell is bash.</p>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-linux" aria-labelledby="tab-linux" hidden>
+        <div class="cmdline"><code>curl -fsSL https://raw.githubusercontent.com/muhib-karim/OpenSH/main/install.sh | bash</code><button class="btn copy" type="button">Copy</button></div>
+        <p>For <code>--copy</code>, install <code>wl-copy</code>, <code>xclip</code> or <code>xsel</code>.</p>
+      </div>
+      <p class="note" role="status" aria-live="polite" id="copy-status"></p>
+    </div>
+  </section>
 
-        <div class="terminal-container">
-            <div class="terminal-header">
-                <div class="dot red"></div>
-                <div class="dot yellow"></div>
-                <div class="dot green"></div>
-            </div>
-            <div class="terminal-content">
-                <div style="margin-bottom: 1.5rem;">
-                    <span class="prompt">~/projects/react-app $</span> <span class="input">delete node_modules and
-                        reinstall</span>
-                    <span class="output">→ rm -rf node_modules && npm install</span>
-                    <span class="result">Removing node_modules...<br>Added 1432 packages in 12s</span>
-                </div>
-                <div>
-                    <span class="prompt">~/projects/react-app $</span> <span class="input">git commit "update styles"
-                        and push</span>
-                    <span class="output">→ git add . && git commit -m "update styles" && git push</span>
-                    <span class="result">[main 8a2f9c] update styles<br>To https://github.com/user/repo.git</span>
-                </div>
-            </div>
-        </div>
-    </header>
+  <section id="safety" aria-labelledby="safety-h">
+    <div class="wrap">
+      <h2 id="safety-h">A guard between the model and your disk</h2>
+      <p class="intro">Every generated command is checked against 60+ rules before it runs. Rules match where a command actually starts, so <code>cat shutdown.log</code> is fine and <code>sudo shutdown</code> is not. 135 paired tests keep it from being too loose or too jumpy.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Category</th><th scope="col">Held for a yes</th><th scope="col">Runs straight away</th></tr></thead>
+          <tbody>
+            <tr><td>Recursive delete</td><td class="held"><code>rm -rf build</code></td><td class="ok"><code>rm build.log</code></td></tr>
+            <tr><td>PowerShell delete</td><td class="held"><code>Remove-Item C:\temp -Recurse</code></td><td class="ok"><code>Remove-Item C:\temp\a.txt</code></td></tr>
+            <tr><td>Disk writes</td><td class="held"><code>dd if=img.iso of=/dev/sdb</code></td><td class="ok"><code>dd if=/dev/sda of=backup.img</code></td></tr>
+            <tr><td>Formatting</td><td class="held"><code>mkfs.ext4 /dev/sdb1</code></td><td class="ok"><code>lsblk /dev/sdb1</code></td></tr>
+            <tr><td>Permissions</td><td class="held"><code>chmod -R 777 /</code></td><td class="ok"><code>chmod -R 755 ./dist</code></td></tr>
+            <tr><td>Fork bomb</td><td class="held"><code>:(){ :|:&amp; };:</code></td><td class="ok"><code>echo ':)'</code></td></tr>
+            <tr><td>Download and run</td><td class="held"><code>curl -fsSL x.sh | bash</code></td><td class="ok"><code>curl -fsSL x.json | jq .</code></td></tr>
+            <tr><td>Git history</td><td class="held"><code>git push --force</code></td><td class="ok"><code>git push origin main</code></td></tr>
+            <tr><td>Power</td><td class="held"><code>shutdown -h now</code></td><td class="ok"><code>cat shutdown.log</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">The guard is a seatbelt, not a sandbox: it lowers the risk, it cannot prove a command is safe. Commands you type yourself run as typed.</p>
+    </div>
+  </section>
 
-    <main class="container" id="install">
-        <div class="install-block">
-            <div class="tabs">
-                <div class="pill active" onclick="setPlatform('win')">Windows</div>
-                <div class="pill" onclick="setPlatform('unix')">macOS / Linux</div>
-            </div>
+  <section id="providers" aria-labelledby="providers-h">
+    <div class="wrap split">
+      <div>
+        <h2 id="providers-h">Bring your own model</h2>
+        <p class="intro">Pick one with <code>!auth</code> or <code>--provider</code>. Keys live in <code>~/.opsh/.env</code> or your environment, are never printed, and are scrubbed from error messages. Requests time out and retry on rate limits.</p>
+      </div>
+      <dl class="providers">
+        <dt>groq</dt><dd>Default. Fast free tier, <code>llama-3.3-70b-versatile</code>.</dd>
+        <dt>gemini</dt><dd>Google AI Studio key, <code>gemini-2.5-flash</code>.</dd>
+        <dt>openai</dt><dd>Any OpenAI-compatible URL: OpenAI, OpenRouter, LM Studio, vLLM.</dd>
+        <dt>ollama</dt><dd>Local models. No key, nothing leaves your machine.</dd>
+        <dt>mock</dt><dd>Offline and deterministic, for tests and demos.</dd>
+      </dl>
+    </div>
+  </section>
+</main>
 
-            <div id="cmd-win" class="command active">
-                irm https://raw.githubusercontent.com/muhib-karim/OpenSH/main/install.ps1 | iex
-            </div>
-            <div id="cmd-unix" class="command">
-                curl -fsSL https://raw.githubusercontent.com/muhib-karim/OpenSH/main/install.sh | bash
-            </div>
+<footer>
+  <div class="wrap">
+    <span>MIT licensed · Based on <a href="https://github.com/junaid-mahmood/nlsh">nlsh</a> by Junaid Mahmood · © 2026 Muhib Karim</span>
+    <span><a href="https://github.com/muhib-karim/OpenSH/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://ko-fi.com/ai_dev_2024">Support on Ko-fi</a></span>
+  </div>
+</footer>
 
-            <button class="btn btn-secondary"
-                style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); height: 2rem; font-size: 0.8rem;"
-                onclick="copyCmd()">
-                Copy
-            </button>
-        </div>
+<script>
+  document.documentElement.classList.add("js");
 
-        <div class="features-grid">
-            <div class="feature">
-                <span class="icon">⚡</span>
-                <h3>Auto-Execute</h3>
-                <p>Generates command, explains it, and runs it instantly. It's safe, fast, and educational.</p>
-            </div>
-            <div class="feature">
-                <span class="icon">🧠</span>
-                <h3>Context Aware</h3>
-                <p>Understands your project structure, file types, and recent history for smarter suggestions.</p>
-            </div>
-            <div class="feature">
-                <span class="icon">🌍</span>
-                <h3>Native</h3>
-                <p>Pure PowerShell on Windows. Bash/Zsh on Unix. Zero dependencies outside Python.</p>
-            </div>
-        </div>
-    </main>
+  // Install tabs: click or arrow keys, one panel visible at a time.
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  function select(tab, focus = true) {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute("aria-selected", on);
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    });
+    if (focus) tab.focus();
+  }
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => select(tab));
+    tab.addEventListener("keydown", e => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (step) { e.preventDefault(); select(tabs[(i + step + tabs.length) % tabs.length]); }
+      if (e.key === "Home") { e.preventDefault(); select(tabs[0]); }
+      if (e.key === "End") { e.preventDefault(); select(tabs[tabs.length - 1]); }
+    });
+  });
+  const ua = navigator.userAgent;
+  if (/Mac/.test(ua)) select(tabs[1], false); else if (/Linux|X11/.test(ua)) select(tabs[2], false);
 
-    <footer>
-        <div class="container">
-            <a href="https://ko-fi.com/ai_dev_2024" target="_blank" class="kofi-highlight">
-                <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt=""
-                    style="width:24px; filter: brightness(100);">
-                Support Development on Ko-fi
-            </a>
+  // Copy buttons
+  const status = document.getElementById("copy-status");
+  document.querySelectorAll(".copy").forEach(btn => btn.addEventListener("click", async () => {
+    const text = btn.previousElementSibling.textContent.trim();
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = "Copied";
+      status.textContent = "Install command copied to the clipboard.";
+    } catch {
+      status.textContent = "Copy failed. Select the command and copy it by hand.";
+    }
+    setTimeout(() => { btn.textContent = "Copy"; }, 1800);
+  }));
 
-            <p style="margin-top: 2rem; color: hsl(var(--muted-foreground)); font-size: 0.9rem;">
-                OpenSH is open source software. <br>
-                License MIT • © 2026 Muhib Karim
-            </p>
-        </div>
-    </footer>
-
-    <script>
-        function setPlatform(p) {
-            document.querySelectorAll('.pill').forEach(e => e.classList.remove('active'));
-            document.querySelectorAll('.command').forEach(e => e.classList.remove('active'));
-
-            if (p === 'win') {
-                document.querySelectorAll('.pill')[0].classList.add('active');
-                document.getElementById('cmd-win').classList.add('active');
-            } else {
-                document.querySelectorAll('.pill')[1].classList.add('active');
-                document.getElementById('cmd-unix').classList.add('active');
-            }
-        }
-
-        function copyCmd() {
-            const text = document.querySelector('.command.active').innerText.trim();
-            navigator.clipboard.writeText(text);
-            const btn = event.target;
-            const originalText = btn.innerText;
-            btn.innerText = 'Copied!';
-            setTimeout(() => btn.innerText = originalText, 2000);
-        }
-    </script>
+  // The one authored moment: the transcript plays line by line.
+  const lines = document.querySelectorAll(".term .line");
+  if (matchMedia("(prefers-reduced-motion: no-preference)").matches) {
+    lines.forEach((line, i) => setTimeout(() => line.classList.add("shown"), 250 + i * 380));
+  }
+</script>
 </body>
-
 </html>

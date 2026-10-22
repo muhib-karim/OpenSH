@@ -37,3 +37,6 @@ build/
 
 # Old nlsh files (kept for reference during development)
 nlsh.py
+
+# Archify working files (the rendered diagram is copied to docs/)
+.archify/

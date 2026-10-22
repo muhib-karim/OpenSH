@@ -1,0 +1,348 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "OpenSH request flow",
+    "subtitle": "From one line of input to a command that ran, was skipped, or was only shown (opsh.py v0.4.0)",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-opsh-flow/opsh-flow.html",
+    "repository": {
+      "url": "https://github.com/muhib-karim/OpenSH.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "311e3d9ba91535380d372b77615a8806b2c6ad3d"
+    }
+  },
+  "lanes": [
+    {
+      "id": "term",
+      "label": "Terminal"
+    },
+    {
+      "id": "local",
+      "label": "Local, no network"
+    },
+    {
+      "id": "model",
+      "label": "Model provider"
+    },
+    {
+      "id": "safety",
+      "label": "Safety guard",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "read",
+      "label": "Read + classify",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "generate",
+      "label": "Generate",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "check",
+      "label": "Check + run",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "input",
+    "classify",
+    "prompt",
+    "llm",
+    "handle",
+    "guard",
+    "confirm",
+    "run"
+  ],
+  "nodes": [
+    {
+      "id": "input",
+      "lane": "term",
+      "col": 0,
+      "type": "frontend",
+      "label": "Your input",
+      "sublabel": "repl / -c",
+      "width": 132,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 1222,
+          "end_line": 1316,
+          "label": "repl"
+        },
+        {
+          "path": "opsh.py",
+          "line": 1205,
+          "end_line": 1219,
+          "label": "run_once"
+        }
+      ]
+    },
+    {
+      "id": "classify",
+      "lane": "local",
+      "col": 1,
+      "type": "backend",
+      "label": "Classifier",
+      "sublabel": "is_natural_language",
+      "width": 140,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 775,
+          "end_line": 843
+        }
+      ]
+    },
+    {
+      "id": "direct",
+      "lane": "local",
+      "col": 4,
+      "type": "backend",
+      "label": "Direct run",
+      "sublabel": "run_direct, no guard",
+      "width": 140,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 1131,
+          "end_line": 1137
+        }
+      ]
+    },
+    {
+      "id": "prompt",
+      "lane": "model",
+      "col": 2,
+      "type": "backend",
+      "label": "Prompt builder",
+      "sublabel": "shell + files + history",
+      "width": 140,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 707,
+          "end_line": 751,
+          "label": "get_command"
+        },
+        {
+          "path": "opsh.py",
+          "line": 613,
+          "end_line": 635,
+          "label": "get_file_context"
+        }
+      ]
+    },
+    {
+      "id": "llm",
+      "lane": "model",
+      "col": 3,
+      "type": "cloud",
+      "label": "Provider + LLM API",
+      "sublabel": "Groq · Gemini · OpenAI · Ollama",
+      "tag": "timeout + retry",
+      "width": 160,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 421,
+          "end_line": 446,
+          "label": "build_provider"
+        },
+        {
+          "path": "opsh.py",
+          "line": 264,
+          "end_line": 312,
+          "label": "http_post_json"
+        },
+        {
+          "path": "opsh.py",
+          "line": 315,
+          "end_line": 337,
+          "label": "Provider"
+        }
+      ]
+    },
+    {
+      "id": "handle",
+      "lane": "safety",
+      "col": 3,
+      "type": "backend",
+      "label": "Handle command",
+      "sublabel": "clean, explain, copy",
+      "width": 140,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 1091,
+          "end_line": 1128,
+          "label": "handle_generated"
+        },
+        {
+          "path": "opsh.py",
+          "line": 762,
+          "end_line": 772,
+          "label": "clean_command"
+        }
+      ]
+    },
+    {
+      "id": "guard",
+      "lane": "safety",
+      "col": 4,
+      "type": "security",
+      "label": "Rule check",
+      "sublabel": "explain_risk, 61 rules",
+      "tag": "reasons",
+      "width": 140,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 956,
+          "end_line": 964
+        },
+        {
+          "path": "opsh.py",
+          "line": 861,
+          "end_line": 952,
+          "label": "GUARD_RULES"
+        }
+      ]
+    },
+    {
+      "id": "confirm",
+      "lane": "safety",
+      "col": 5,
+      "type": "security",
+      "label": "Confirm y/N",
+      "sublabel": "confirm_if_destructive",
+      "width": 150,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 972,
+          "end_line": 982
+        }
+      ]
+    },
+    {
+      "id": "run",
+      "lane": "term",
+      "col": 5,
+      "type": "backend",
+      "label": "Run in shell",
+      "sublabel": "bash / zsh / PowerShell",
+      "width": 150,
+      "sources": [
+        {
+          "path": "opsh.py",
+          "line": 1031,
+          "end_line": 1041,
+          "label": "run_command"
+        },
+        {
+          "path": "opsh.py",
+          "line": 1022,
+          "end_line": 1028,
+          "label": "shell_argv"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "in-classify",
+      "from": "input",
+      "to": "classify"
+    },
+    {
+      "id": "english",
+      "from": "classify",
+      "to": "prompt",
+      "label": "English",
+      "variant": "emphasis"
+    },
+    {
+      "id": "shell-input",
+      "from": "classify",
+      "to": "direct",
+      "label": "shell input",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "prompt-llm",
+      "from": "prompt",
+      "to": "llm",
+      "label": "POST",
+      "variant": "emphasis"
+    },
+    {
+      "id": "llm-handle",
+      "from": "llm",
+      "to": "handle",
+      "label": "one command"
+    },
+    {
+      "id": "handle-guard",
+      "from": "handle",
+      "to": "guard"
+    },
+    {
+      "id": "flagged",
+      "from": "guard",
+      "to": "confirm",
+      "label": "flagged",
+      "variant": "security"
+    },
+    {
+      "id": "confirmed",
+      "from": "confirm",
+      "to": "run",
+      "label": "y",
+      "variant": "emphasis"
+    },
+    {
+      "id": "direct-run",
+      "from": "direct",
+      "to": "run",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Paths that skip the model",
+      "items": [
+        "Built-ins (cd, !auth, !explain…) are handled in repl",
+        "Shell input and !cmd run as typed, without the guard"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Paths that never run",
+      "items": [
+        "--dry-run stops in handle_generated after showing the command",
+        "Anything but y at the prompt prints Skipped"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Unflagged commands",
+      "items": [
+        "Run straight away; with --explain they also ask Run it? [Y/n]"
+      ]
+    }
+  ]
+}

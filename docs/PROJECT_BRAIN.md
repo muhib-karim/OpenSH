@@ -15,9 +15,10 @@ provider, regex safety guard before anything destructive runs. Single file `opsh
 - Never push to main; push only through the owner's gated push script. No local heavy builds.
 
 ## Status
-v0.4.0 work on branch `upgrade/v0.4.0` (see TASKS.md for the checklist).
+v0.4.0 on branch `upgrade/v0.4.0`: guard, providers, UX, unittest suite (117 tests, 99% coverage) and CI
+committed and pushed; waiting on first CI run.
 
 ## Next step
-See TASKS.md.
+Docs: README refresh, landing page, CHANGELOG [0.4.0], SKILLS_USED.md, HANDOFF.md; then CI green.
 
 ## Session log

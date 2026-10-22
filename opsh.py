@@ -13,6 +13,7 @@ from __future__ import annotations
 __version__ = "0.4.0"
 
 import argparse
+import contextlib
 import getpass
 import importlib
 import json
@@ -77,21 +78,22 @@ def detect_shell(system: Optional[str] = None, env: Optional[Mapping[str, str]] 
     """Pick the shell to generate commands for: OPENSH_SHELL, then $SHELL, then the OS default."""
     env = os.environ if env is None else env
     system = system or platform.system()
-    override = env.get("OPENSH_SHELL", "").strip()
+    override = _known_shell(env.get("OPENSH_SHELL", ""))
     if override:
-        try:
-            return normalize_shell(override)
-        except ValueError:
-            pass
+        return override
     if system == "Windows":
         return "powershell"
-    login_shell = env.get("SHELL", "").strip()
-    if login_shell:
-        try:
-            return normalize_shell(login_shell)
-        except ValueError:
-            pass
-    return "zsh" if system == "Darwin" else "bash"
+    return _known_shell(env.get("SHELL", "")) or ("zsh" if system == "Darwin" else "bash")
+
+
+def _known_shell(name: str) -> Optional[str]:
+    """normalize_shell, or None for an empty or unsupported name (which then falls back to the OS default)."""
+    if not name.strip():
+        return None
+    try:
+        return normalize_shell(name)
+    except ValueError:
+        return None
 
 
 def get_platform_info(system: Optional[str] = None, shell: Optional[str] = None) -> Dict[str, Any]:
@@ -238,10 +240,9 @@ def save_api_key(provider: str, api_key: str) -> None:
     with open(env_path, "w", encoding="utf-8") as f:
         for key, value in env_vars.items():
             f.write(f"{key}={value}\n")
-    try:
+    # Owner-only on macOS/Linux; Windows and some filesystems don't support it, and the file still works.
+    with contextlib.suppress(OSError):
         os.chmod(env_path, 0o600)
-    except OSError:
-        pass
 
 
 # --- Providers ----------------------------------------------------------------
@@ -645,22 +646,19 @@ def get_file_context(cwd: str) -> str:
     context_parts = []
 
     # Current directory listing (top 20 items)
-    try:
+    # An unreadable folder just means less context for the model.
+    with contextlib.suppress(OSError):
         items = os.listdir(cwd)[:20]
         if items:
             context_parts.append(f"Files in current directory ({cwd}):\n" + "\n".join(f"  {item}" for item in items))
-    except OSError:
-        pass
 
     # Desktop listing if not already in desktop
     desktop_path = Path.home() / "Desktop"
     if desktop_path.exists() and str(desktop_path) != cwd:
-        try:
+        with contextlib.suppress(OSError):  # same: skip the Desktop listing if it can't be read
             items = os.listdir(desktop_path)[:20]
             if items:
                 context_parts.append("Files on Desktop:\n" + "\n".join(f"  {item}" for item in items))
-        except OSError:
-            pass
 
     return "\n\n".join(context_parts) if context_parts else ""
 
@@ -712,10 +710,8 @@ def append_history(line: str, path: Optional[Path] = None) -> bool:
     try:
         with open(path, "a", encoding="utf-8") as f:
             f.write(line.replace("\n", " ") + "\n")
-        try:
+        with contextlib.suppress(OSError):  # owner-only where supported, like .env
             os.chmod(path, 0o600)
-        except OSError:
-            pass
         lines = read_history_file(path)
         if path.stat().st_size > 200 * HISTORY_LIMIT:
             with open(path, "w", encoding="utf-8") as f:
@@ -1379,10 +1375,9 @@ def _safe_output() -> None:
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
-            try:
+            # A stream that can't be reconfigured keeps its default error handling.
+            with contextlib.suppress(ValueError, OSError):
                 reconfigure(errors="replace")
-            except (ValueError, OSError):
-                pass
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

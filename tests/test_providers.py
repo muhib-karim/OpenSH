@@ -5,8 +5,8 @@ import io
 import json
 import os
 import unittest
+import unittest.mock as mock
 import urllib.error
-from unittest import mock
 
 from support import WINDOWS, IsolatedTestCase, opsh
 

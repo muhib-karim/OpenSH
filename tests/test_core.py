@@ -5,7 +5,7 @@ import pathlib
 import subprocess
 import sys
 import unittest
-from unittest import mock
+import unittest.mock as mock
 
 from support import LINUX, MACOS, WINDOWS, IsolatedTestCase, opsh
 

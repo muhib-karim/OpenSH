@@ -196,6 +196,11 @@ OpenSH/
 
 Issues and PRs are welcome. Please add a test in `tests/` for anything that touches the safety guard or the classifier.
 
+## Tech stack
+
+- **Language:** Python, standard library only (API calls go through `urllib`); `pyreadline3` is optional on Windows
+- **CI:** GitHub Actions
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Based on [nlsh](https://github.com/junaid-mahmood/nlsh) by Junaid Mahmood; see [CREDITS.md](CREDITS.md). If OpenSH is useful to you, you can support it on [Ko-fi](https://ko-fi.com/ai_dev_2024).

@@ -4,7 +4,7 @@
 
 **Talk to your terminal in plain English.**
 
-[![License: MIT](https://img.shields.io/github/license/muhib-karim/OpenSH)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Top language](https://img.shields.io/github/languages/top/muhib-karim/OpenSH)](https://github.com/muhib-karim/OpenSH)
 [![CI](https://github.com/muhib-karim/OpenSH/actions/workflows/ci.yml/badge.svg)](https://github.com/muhib-karim/OpenSH/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/muhib-karim/OpenSH)](https://github.com/muhib-karim/OpenSH/releases/latest)
@@ -203,4 +203,7 @@ Issues and PRs are welcome. Please add a test in `tests/` for anything that touc
 
 ## License
 
+MIT License. Copyright 2026 Muhib Karim. See [LICENSE](LICENSE).
+
 MIT, see [LICENSE](LICENSE). Based on [nlsh](https://github.com/junaid-mahmood/nlsh) by Junaid Mahmood; see [CREDITS.md](CREDITS.md). If OpenSH is useful to you, you can support it on [Ko-fi](https://ko-fi.com/ai_dev_2024).
+

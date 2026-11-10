@@ -1,31 +1,18 @@
 """Unit tests for OpenSH's non-network logic: classifier, history, config, prompt, providers, CLI."""
-import importlib.util
 import io
 import json
 import pathlib
 import subprocess
 import sys
 import urllib.error
+from email.message import Message
 
 import pytest
+from conftest import LINUX, WINDOWS
+
+import opsh
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location("opsh", ROOT / "opsh.py")
-opsh = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(opsh)
-
-LINUX = {"name": "Linux", "shell": "bash", "home": pathlib.Path.home(), "path_sep": "/"}
-WINDOWS = {"name": "Windows", "shell": "PowerShell", "home": pathlib.Path.home(), "path_sep": "\\"}
-
-
-@pytest.fixture(autouse=True)
-def isolated(monkeypatch, tmp_path):
-    """Keep every test away from the real config, .env, history and home folder."""
-    monkeypatch.setattr(opsh, "config_path", tmp_path / "config.json")
-    monkeypatch.setattr(opsh, "env_path", tmp_path / ".env")
-    monkeypatch.setattr(opsh, "command_history", [])
-    monkeypatch.setattr(opsh.Path, "home", classmethod(lambda cls: tmp_path / "home"))
-    monkeypatch.setattr(opsh, "PLATFORM", LINUX)
 
 
 # --- version comparison ------------------------------------------------------
@@ -115,7 +102,7 @@ def test_save_api_key_keeps_other_keys_and_load_env_reads_them(monkeypatch):
     assert opsh.env_path.read_text().splitlines() == ["OTHER=1", "GROQ_API_KEY=test-groq", "GEMINI_API_KEY=test-gemini"]
 
     for key in ("OTHER", "GROQ_API_KEY", "GEMINI_API_KEY"):
-        monkeypatch.setenv(key, "unset")  # so monkeypatch restores the real value afterwards
+        monkeypatch.delenv(key, raising=False)  # exported variables win over the file, so start clean
     opsh.load_env()
     assert opsh.os.environ["GROQ_API_KEY"] == "test-groq"
     assert opsh.os.environ["GEMINI_API_KEY"] == "test-gemini"
@@ -135,7 +122,7 @@ def test_prompt_includes_request_files_and_history(monkeypatch, tmp_path):
     work = tmp_path / "work"
     (work / "Current Resume").mkdir(parents=True)
     opsh.add_to_history("git status", "On branch main")
-    captured = {}
+    captured: dict[str, str] = {}
     monkeypatch.setattr(opsh, "get_ai_response", lambda p: captured.setdefault("prompt", p) and "ls")
 
     assert opsh.get_command("open the resume folder", str(work)) == "ls"
@@ -148,7 +135,7 @@ def test_prompt_includes_request_files_and_history(monkeypatch, tmp_path):
 
 def test_windows_prompt_asks_for_powershell(monkeypatch, tmp_path):
     monkeypatch.setattr(opsh, "PLATFORM", WINDOWS)
-    captured = {}
+    captured: dict[str, str] = {}
     monkeypatch.setattr(opsh, "get_ai_response", lambda p: captured.setdefault("prompt", p))
     opsh.get_command("list files", str(tmp_path))
     assert "PowerShell command for Windows" in captured["prompt"]
@@ -170,7 +157,7 @@ def test_groq_parses_response_and_retries_on_429(monkeypatch):
     def fake_urlopen(req, timeout):
         calls.append(req)
         if len(calls) == 1:
-            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", Message(), None)
         body = {"choices": [{"message": {"content": "  ls -la\n"}}]}
         return _FakeResponse(json.dumps(body).encode())
 
@@ -179,7 +166,7 @@ def test_groq_parses_response_and_retries_on_429(monkeypatch):
     assert opsh.call_groq("prompt", "test-key") == "ls -la"
     assert len(calls) == 2
     assert calls[0].get_header("Authorization") == "Bearer test-key"
-    assert json.loads(calls[0].data)["model"] == "llama-3.3-70b-versatile"
+    assert json.loads(calls[0].data)["model"] == opsh.DEFAULT_MODELS["groq"]
 
 
 def test_gemini_parses_response(monkeypatch):
@@ -190,7 +177,7 @@ def test_gemini_parses_response(monkeypatch):
 
 def test_provider_gives_up_after_repeated_429(monkeypatch):
     def always_429(req, timeout):
-        raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+        raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", Message(), None)
     monkeypatch.setattr(opsh.urllib.request, "urlopen", always_429)
     monkeypatch.setattr(opsh.time, "sleep", lambda s: None)
     with pytest.raises(Exception, match="Rate limit"):

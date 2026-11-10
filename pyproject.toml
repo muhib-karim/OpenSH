@@ -1,0 +1,29 @@
+# Tool configuration only. OpenSH is a single script (opsh.py) with no runtime
+# dependencies, so there is nothing to build or package here.
+
+[tool.ruff]
+target-version = "py39"
+line-length = 130
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, spawn the CLI, and hold command strings that mention /tmp.
+"tests/*" = ["S101", "S108", "S603", "S607"]
+
+[tool.mypy]
+files = ["opsh.py", "tests"]
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = ["conftest", "test_core", "test_safety", "test_regressions", "test_guard_bypasses", "test_repo_hygiene"]
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

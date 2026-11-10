@@ -1,11 +1,7 @@
-import importlib.util
-import pathlib
-
+"""The original guard cases: what must be flagged, what must not, and the confirmation flow."""
 import pytest
 
-_spec = importlib.util.spec_from_file_location("opsh", pathlib.Path(__file__).resolve().parents[1] / "opsh.py")
-opsh = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(opsh)
+import opsh
 
 
 @pytest.mark.parametrize("cmd", [

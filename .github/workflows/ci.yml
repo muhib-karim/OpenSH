@@ -9,7 +9,39 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  lint:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # mypy 2.x needs Python 3.10+ to run, so linting happens on one modern
+      # version; Python 3.9 compatibility is proven by the test matrix below.
+      - name: Install ruff and mypy
+        run: python -m pip install ruff==0.17.4 mypy==2.4.1 pytest
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Mypy (Linux and macOS code paths)
+        run: mypy
+
+      - name: Mypy (Windows code paths)
+        run: mypy --platform win32
+
+      - name: Shell script syntax
+        run: bash -n install.sh && bash -n uninstall.sh
+
   test:
     name: Test on ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -17,7 +49,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.9', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        # setup-python has no Python 3.9 build for the newest Ubuntu image that
+        # ubuntu-latest points at, so that one combination runs on Ubuntu 24.04.
+        exclude:
+          - os: ubuntu-latest
+            python-version: '3.9'
+        include:
+          - os: ubuntu-24.04
+            python-version: '3.9'
 
     steps:
       - uses: actions/checkout@v4
@@ -41,19 +81,15 @@ jobs:
       - name: Unit tests
         run: python -m pytest -q tests
 
-  lint:
-    name: Lint
+  secrets:
+    name: Secret scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          fetch-depth: 0  # scan the whole history, not just the tip
 
-      - name: Install ruff
-        run: python -m pip install ruff==0.17.0
-
-      - name: Ruff (syntax errors and undefined names)
-        run: ruff check --select E9,F63,F7,F82 opsh.py tests
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
+            git /repo --redact --no-banner --exit-code 1

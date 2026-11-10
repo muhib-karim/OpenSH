@@ -1,5 +1,7 @@
 # OpenSH - Windows PowerShell Uninstaller
 # Based on nlsh (https://github.com/junaid-mahmood/nlsh)
+#
+# Keep this file ASCII-only: Windows PowerShell 5.1 misreads UTF-8 without a BOM.
 
 $INSTALL_DIR = "$env:USERPROFILE\.opsh"
 
@@ -31,5 +33,5 @@ if (Test-Path $profilePath) {
 }
 
 Write-Host ""
-Write-Host "✓ OpenSH has been removed" -ForegroundColor Green
+Write-Host "OpenSH has been removed" -ForegroundColor Green
 Write-Host ""

@@ -29,7 +29,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -817,37 +817,130 @@ def change_directory(target: str) -> str | None:
 # --- Safety guard -----------------------------------------------------------
 # AI-generated commands run automatically, except ones that can destroy data or
 # take the machine down. Those are shown and need an explicit "y" first.
-_DESTRUCTIVE_PATTERNS = [
-    r"\brm\s+(-[a-z]*[rf][a-z]*\s+)+",          # rm -r / rm -f / rm -rf
-    r"\brm\s+.*--(recursive|force)\b",
-    r"\brmdir\s+/s\b", r"\brd\s+/s\b", r"\bdel\s+.*/[sq]\b",
-    r"\bremove-item\b.*-(recurse|force)\b",
-    r"\bmkfs(\.\w+)?\b", r"\bformat(-volume)?\s+[a-z]:", r"\bdiskpart\b",
-    r"\bdd\s+.*\bof=", r">\s*/dev/(sd|nvme|disk|hd)",
-    r"\b(shutdown|reboot|halt|poweroff)\b", r"\b(stop|restart)-computer\b",
-    r"\bgit\s+push\s+.*(--force|-f)\b", r"\bgit\s+reset\s+--hard\b", r"\bgit\s+clean\s+-[a-z]*f",
-    r"\bchmod\s+(-r\s+)?[0-7]*777\s+/(\s|$)", r"\bchown\s+-r\b.*\s/(\s|$)",
-    r":\(\)\s*\{\s*:\|:&\s*\};:",            # fork bomb
-    r"\b(drop\s+(table|database))\b", r"\btruncate\s+table\b",
-    r"\bkillall\b", r"\bkill\s+-9\s+-1\b", r"\bstop-process\b.*-force",
-    r"\bcurl\b[^|]*\|\s*(sudo\s+)?(ba|z)?sh\b", r"\biwr\b[^|]*\|\s*iex\b",
+#
+# A command is checked in two forms: as written (with Unicode dashes and smart
+# quotes mapped to ASCII and line continuations joined), and with quoting and
+# escaping stripped, so `r\m`, "rm" and rm${IFS}-rf are all seen as rm. Anything
+# the rules cannot see through (eval, a download piped into an interpreter,
+# encoded PowerShell, a variable used as the command) is flagged too.
+_S = r"[^;&|\n]*"  # stays inside one simple command
+_I = re.IGNORECASE
+_GUARD_RULES: list[tuple[str, str, int]] = [
+    # deletes
+    ("recursive or forced delete", rf"\brm\b(?={_S}\s-[a-z]*[rf])", _I),
+    ("recursive or forced delete", rf"\brm\b(?={_S}\s--(recursive|force|no-preserve-root|dir)\b)", _I),
+    ("recursive or forced delete", rf"\b(remove-item|ri|rmdir|rd|del|erase)\b(?={_S}\s(-r\w*|-fo\w*|/s|/q|/f)\b)", _I),
+    ("wildcard delete", rf"\b(rm|remove-item|ri|del|erase)\b(?={_S}\*)", _I),
+    ("mass delete", rf"\bxargs\b{_S}\b(rm|shred|unlink)\b", _I),
+    ("mass delete", rf"\bfind\b{_S}\s-(delete\b|exec(dir)?\s+(sudo\s+)?(rm|shred|unlink)\b)", _I),
+    ("mass delete", r"\|\s*(remove-item|ri|rm|del|erase|rd|rmdir)\b", _I),
+    ("mass delete", rf"\bforfiles\b{_S}\b(del|erase|rd|rmdir|remove-item)\b", _I),
+    ("delete through an API", r"\.delete\(|\]::delete\(|\b(rmtree|rm_rf|rmsync|removedirs)\b", _I),
+    # wipes and overwrites
+    ("data wipe", r"\b(shred|wipefs|blkdiscard|srm)\b", _I),
+    ("data wipe", rf"\btruncate\b{_S}(-s\s*0\b|--size[= ]0\b)", _I),
+    ("data wipe", rf"\bmv\b{_S}/dev/null\b|\brsync\b{_S}--delete|\bcrontab\b{_S}\s-[a-z]*r\b|\btar\b{_S}--remove-files", _I),
+    ("data wipe", r"\bclear-(content|recyclebin|disk)\b|\breg\s+delete\b|\bvssadmin\s+delete\b|\bwevtutil\s+cl\b", _I),
+    ("data wipe", rf"\bbcdedit\b{_S}/delete|\brobocopy\b{_S}/(mir|purge)\b", _I),
+    ("system file overwrite", rf"(>\s*|\btee\b{_S}\s)(/etc/|/boot/|/proc/sysrq)", _I),
+    # disks and filesystems
+    ("disk or filesystem", r"\bmkfs(\.\w+)?\b|\bmke2fs\b|\bmkswap\b|\bnewfs\w*\b|\bdiskpart\b|\bcipher\s+/w", _I),
+    ("disk or filesystem", rf"\b(fdisk|sfdisk|sgdisk|parted)\b(?!{_S}(\s-l\b|--list\b|\sprint\b))", _I),
+    ("disk or filesystem", r"\bcryptsetup\s+(luksformat|erase)\b|\b(lv|vg|pv)remove\b|\bz(pool|fs)\s+destroy\b", _I),
+    ("disk or filesystem", rf"\bhdparm\b{_S}--security-erase", _I),
+    ("disk or filesystem", r"\bdiskutil\s+(erase\w*|zerodisk|secureerase|partitiondisk|reformat)\b", _I),
+    ("disk or filesystem", r"\bformat(-volume)?\s+[a-z]:|\b(format-volume|initialize-disk|remove-partition)\b", _I),
+    ("disk or filesystem", rf"\bdd\b{_S}\bof=", _I),
+    ("raw device write", rf"(>\s*|\b(tee|cp|cat|dd)\b{_S}\s)/dev/(sd|hd|vd|xvd|nvme|mmcblk|r?disk|dm-|md\d|mapper/)", _I),
+    # permissions (case-sensitive: chmod -R is recursive, chmod -r removes read access)
+    ("recursive permission change", rf"\b(chmod|chown|chgrp|chattr|setfacl)\b(?={_S}\s(-[a-zA-Z]*R|--recursive\b))", 0),
+    ("recursive permission change", rf"\b(icacls|cacls|takeown)\b{_S}\s/[tr]\b|\battrib\b{_S}\s/s\b", _I),
+    ("permission change on /", rf"\bch(mod|own|grp)\b{_S}\s/(\s|$)", _I),
+    # power and processes
+    ("shutdown or reboot", r"\b(shutdown|reboot|halt|poweroff)\b|\b(stop|restart)-computer\b", _I),
+    ("shutdown or reboot", r"\b(tel)?init\s+[06]\b|\bshut\s+down\b|\blogoff\b", _I),
+    ("shutdown or reboot", rf"\bosascript\b{_S}\b(restart|shut\s*down)\b", _I),
+    ("mass process kill", rf"\bkillall5?\b|\bpkill\b|\bkill\b{_S}\s-1\b|\btaskkill\b{_S}/f\b", _I),
+    ("mass process kill", rf"\b(stop-process|spps)\b{_S}\s-fo|\|\s*(stop-process|spps|kill)\b", _I),
+    ("fork bomb", r"([\w:]+)\s*\(\)\s*\{\s*\1\s*\|\s*\1\s*&|%0\s*\|\s*%0", _I),
+    ("fork bomb", r"\bfork\s+while\b|\bwhile\b.*\bfork\b", _I | re.DOTALL),
+    ("endless spawn loop", r"\bwhile\s*(\(\s*\$?true\s*\)|true\b|:|1\b).*(&\s*;?\s*done\b|start-process)", _I | re.DOTALL),
+    ("endless spawn loop", r"\bfor\s*\(\s*;\s*;\s*\).*(&|start-process)", _I | re.DOTALL),
+    # git
+    ("git history rewrite", rf"\bgit\b(?={_S}\bpush\b)(?={_S}(\s--force|\s-f\b|\s--mirror|\s--delete|\s-d\b|\s\+\w|\s:\w))", _I),
+    ("git history rewrite", rf"\bgit\b(?={_S}\breset\b)(?={_S}--hard\b)", _I),
+    ("git data loss", rf"\bgit\b(?={_S}\bclean\b)(?={_S}(\s-[a-z]*f|--force))", _I),
+    ("git data loss", rf"\bgit\b{_S}\b(checkout|restore)\b{_S}\s(--\s+)?\.(\s|$)|\bgit\b{_S}\bstash\s+(clear|drop)\b", _I),
+    ("git data loss", rf"\bgit\b{_S}\b(filter-branch|filter-repo|reflog\s+expire|update-ref\s+-d)\b|--prune=now", _I),
+    ("git data loss", rf"\bgit\b{_S}\bbranch\b{_S}\s-D\b", 0),
+    # databases and infrastructure
+    ("database", r"\bdrop\s+(table|database|schema|index|view|user|role)\b|\bdelete\s+from\b", _I),
+    ("database", r"\btruncate\s+(table\s+)?[a-z_]\w*", _I),
+    ("database", rf"\bdropdb\b|\bmysqladmin\b{_S}\bdrop\b|dropdatabase\(|\bflush(all|db)\b", _I),
+    ("infrastructure", rf"\bdocker\b{_S}\bprune\b|\bdocker\b{_S}\bvolume\s+rm\b|\bdocker\b{_S}\bdown\b{_S}(\s-v\b|--volumes)", _I),
+    ("infrastructure", rf"\bkubectl\b{_S}\bdelete\b|\bhelm\s+(uninstall|delete)\b|\bterraform\b{_S}\bdestroy\b", _I),
+    ("infrastructure", rf"\baws\b{_S}(\srb\s|terminate-instances|\sdelete-)|\b(gcloud|az|gsutil)\b{_S}\s(delete|rm)\b", _I),
+    ("system accounts", r"\buserdel\b|\bpasswd\s+-d\b|\biptables\s+(-f|--flush)\b", _I),
+    # running code the guard cannot read
+    ("pipe into a shell", r"\|&?\s*(sudo\s+(-\S+\s+)*)?(env\s+)?(\S*/)?((ba|z|da|k|fi|c|tc)?sh|pwsh|powershell)\b", _I),
+    ("pipe into an interpreter", r"\|&?\s*(sudo\s+(-\S+\s+)*)?(env\s+)?(\S*/)?(python[\d.]*|perl|ruby|node|php)(\s+-)?\s*($|[;&|\n])", _I),
+    ("pipe into a shell", rf"\|\s*xargs\b{_S}\b(ba|z|da|k)?sh\b", _I),
+    ("download and run", r"(^|[\s;&|])(\.|source|(ba|z|da|k)?sh)\s+<\(|\$\([^)]*\b(curl|wget|fetch|iwr|irm)\b", _I),
+    ("download and run", r"\b(curl|wget|fetch|iwr|irm|invoke-webrequest|invoke-restmethod|certutil|bitsadmin|start-bitstransfer)\b"
+                         r".*(&&|;|\|\||\n).*(\b(ba|z|da|k)?sh\s|\bchmod\s+\+x|(^|\s)\.[/\\]|\.exe\b|\bpython[\d.]*\s|\bstart-process\b)",
+     _I | re.DOTALL),
+    ("download and run", rf"\b(iex|invoke-expression)\b|downloadstring\(|frombase64string|\bmshta\b|\bregsvr32\b{_S}/i:", _I),
+    ("download and run", rf"\bcertutil\b{_S}-urlcache|\bbitsadmin\b{_S}/transfer", _I),
+    ("hidden command", rf"\beval\b|\b(powershell|pwsh)(\.exe)?\b{_S}\s-e\w*\s+[a-z0-9+/=]{{12,}}", _I),
+    ("hidden command", r"\$'[^']*\\(x[0-9a-f]{2}|[0-7]{3})|\b(ba|z|da|k)?sh\s+-c\s+[\"']?\$\(", _I),
+    ("hidden command", r"(^|[;&|\n]\s*)(\$\{?\w+(:-[^}]*)?\}?\s+-\w|\$\(|`)", _I),
+    ("hidden command", rf"\b(python[\d.]*|perl|ruby|node|php)\b{_S}\s-(c|e)\b"
+                       r".*(os\.(system|remove|unlink|fork)|subprocess|shutil|system\(|exec\(|unlink|child_process|urlopen)",
+     _I | re.DOTALL),
+    ("control characters", r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", 0),
 ]
-_DESTRUCTIVE_RE = [re.compile(p, re.IGNORECASE) for p in _DESTRUCTIVE_PATTERNS]
+_GUARD = [(reason, re.compile(pattern, flags)) for reason, pattern, flags in _GUARD_RULES]
+_DASHES = dict.fromkeys(map(ord, "\u2010\u2011\u2012\u2013\u2014\u2015\u2212"), "-")
+_QUOTES = {**dict.fromkeys(map(ord, "\u201c\u201d\u201e"), '"'), **dict.fromkeys(map(ord, "\u2018\u2019\u201a"), "'")}
+
+
+def _guard_views(cmd: str) -> Iterator[str]:
+    """The two forms of a command the rules are matched against."""
+    raw = cmd.translate(_DASHES).translate(_QUOTES)
+    raw = re.sub(r"\\\r?\n", "", raw)  # shell line continuations
+    yield raw
+    text = re.sub(r"/\*.*?\*/", " ", raw, flags=re.DOTALL)  # SQL comments
+    text = re.sub(r"\$\{?IFS\}?", " ", text)  # $IFS used as a space
+    text = re.sub(r"\$\{\w*\}", "", text)  # empty-variable padding such as r${x}m
+    text = re.sub(r"[\"'`^]", "", text)  # quotes, PowerShell backticks, cmd carets
+    text = re.sub(r"\\(?=[A-Za-z-])", "", text)  # r\m, -\rf
+    yield re.sub(r"[ \t]+", " ", text)
+
+
+def destructive_reason(cmd: str) -> str | None:
+    """Why a command needs confirmation, or None when it may run straight away."""
+    if not cmd:
+        return None
+    for view in _guard_views(cmd):
+        for reason, pattern in _GUARD:
+            if pattern.search(view):
+                return reason
+    return None
 
 
 def is_destructive(cmd: str) -> bool:
     """True when a command could delete data, wipe a disk, rewrite history or stop the machine."""
-    if not cmd:
-        return False
-    return any(r.search(cmd) for r in _DESTRUCTIVE_RE)
+    return destructive_reason(cmd) is not None
 
 
 def confirm_if_destructive(cmd: str, assume_yes: bool = False, ask: Callable[[str], str] = input) -> bool:
     """Return True if the command may run. Destructive commands need an explicit yes."""
-    if not is_destructive(cmd) or assume_yes:
+    reason = destructive_reason(cmd)
+    if reason is None or assume_yes:
         return True
     try:
-        answer = ask("\033[31m\u26a0 This command can delete data or stop your machine. Run it? [y/N]\033[0m ")
+        answer = ask(f"\033[31m⚠ Flagged: {reason}. This command can delete data or stop your machine. "
+                     "Run it? [y/N]\033[0m ")
     except (EOFError, KeyboardInterrupt):
         return False
     return answer.strip().lower() in ("y", "yes")

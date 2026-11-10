@@ -151,7 +151,7 @@ jobs:
           cat SHA256SUMS
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: OpenSH v${{ needs.verify.outputs.version }}
           tag_name: v${{ needs.verify.outputs.version }}

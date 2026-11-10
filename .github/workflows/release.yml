@@ -7,12 +7,59 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 0.2.0)'
+        description: 'Version to release; must equal __version__ in opsh.py (e.g. 0.4.0)'
         required: true
 
+# Jobs get a read-only token. Only the job that publishes the release can write.
+permissions:
+  contents: read
+
 jobs:
+  verify:
+    name: Check version and run tests
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # The input goes through the environment, never straight into the script,
+      # and has to be a plain X.Y.Z that matches what the program reports.
+      - name: Resolve and validate version
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::The release version must look like X.Y.Z"
+            exit 1
+          fi
+          actual="$(python opsh.py --version)"
+          if [ "$actual" != "OpenSH v$version" ]; then
+            echo "::error::Release $version does not match opsh.py, which reports: $actual"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+          python -m pytest -q tests
+
   build-and-release:
     name: Build on ${{ matrix.os }}
+    needs: verify
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -38,7 +85,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
+          pip install pyinstaller==6.22.3
 
       - name: Create standalone executable (Windows)
         if: matrix.os == 'windows-latest'
@@ -83,7 +130,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: build-and-release
+    needs: [verify, build-and-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -95,26 +142,22 @@ jobs:
         with:
           path: artifacts
 
-      - name: Get version
-        id: version
+      - name: Collect archives and write checksums
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-          fi
+          mkdir release
+          find artifacts -type f \( -name '*.zip' -o -name '*.tar.gz' \) -exec cp {} release/ \;
+          cd release
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          name: OpenSH v${{ steps.version.outputs.version }}
-          tag_name: v${{ steps.version.outputs.version }}
+          name: OpenSH v${{ needs.verify.outputs.version }}
+          tag_name: v${{ needs.verify.outputs.version }}
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            artifacts/opsh-windows/*.zip
-            artifacts/opsh-linux/*.tar.gz
-            artifacts/opsh-macos/*.tar.gz
+          files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

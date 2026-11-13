@@ -912,6 +912,7 @@ def _guard_views(cmd: str) -> Iterator[str]:
     text = re.sub(r"/\*.*?\*/", " ", raw, flags=re.DOTALL)  # SQL comments
     text = re.sub(r"\$\{?IFS\}?", " ", text)  # $IFS used as a space
     text = re.sub(r"\$\{\w*\}", "", text)  # empty-variable padding such as r${x}m
+    text = re.sub(r"\$(?=['\"])", "", text)  # bash ANSI-C quoting: $'r'$'m' is rm
     text = re.sub(r"[\"'`^]", "", text)  # quotes, PowerShell backticks, cmd carets
     text = re.sub(r"\\(?=[A-Za-z-])", "", text)  # r\m, -\rf
     yield re.sub(r"[ \t]+", " ", text)

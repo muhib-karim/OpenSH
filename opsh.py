@@ -52,7 +52,7 @@ commands_run = 0
 _color_enabled = True
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|[\x01\x02]")
-_CONTROL_RE = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 EXIT_WORDS = ("exit", "quit", "bye", "goodbye")
 

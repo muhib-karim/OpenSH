@@ -892,7 +892,7 @@ _GUARD_RULES: list[tuple[str, str, int]] = [
     ("download and run", rf"\b(iex|invoke-expression)\b|downloadstring\(|frombase64string|\bmshta\b|\bregsvr32\b{_S}/i:", _I),
     ("download and run", rf"\bcertutil\b{_S}-urlcache|\bbitsadmin\b{_S}/transfer", _I),
     ("hidden command", rf"\beval\b|\b(powershell|pwsh)(\.exe)?\b{_S}\s-e\w*\s+[a-z0-9+/=]{{12,}}", _I),
-    ("hidden command", r"\$'[^']*\\(x[0-9a-f]{2}|[0-7]{3})|\b(ba|z|da|k)?sh\s+-c\s+[\"']?\$\(", _I),
+    ("hidden command", r"\$'[^']*\\(x[0-9a-f]{2}|u[0-9a-f]{4}|[0-7]{3})|\b(ba|z|da|k)?sh\s+-c\s+[\"']?\$\(", _I),
     ("hidden command", r"(^|[;&|\n]\s*)(\$\{?\w+(:-[^}]*)?\}?\s+-\w|\$\(|`)", _I),
     ("hidden command", rf"\b(python[\d.]*|perl|ruby|node|php)\b{_S}\s-(c|e)\b"
                        r".*(os\.(system|remove|unlink|fork)|subprocess|shutil|system\(|exec\(|unlink|child_process|urlopen)",

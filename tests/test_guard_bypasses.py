@@ -396,6 +396,11 @@ FLAGGED = {
         "bash -c $'r'$'m' -rf /x'",
         "sh -c $'r'$'m' -rf /x'",
         "bash -c $'r'$'m' -r -f /tmp/x'",
+        # ANSI-C quoting also decodes \uHHHH escapes: no literal "rm" in either
+        # guard view unless the escape is flagged or decoded.
+        "$'\\u0072'$'\\u006d' -rf /tmp/x",
+        "r$'\\u006d' -rf /tmp/x",
+        "sudo $'\\u0072\\u006d' -rf /",
     ],
 }
 

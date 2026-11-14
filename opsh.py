@@ -546,7 +546,7 @@ MAX_CONTEXT_CHARS = 4000
 _SECRET_RE = re.compile(
     r"gsk_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,}"
     r"|\bsk-[A-Za-z0-9_-]{20,}"  # OpenAI, including sk-proj- (boundary keeps "task-..." intact)
-    r"|gh[pousr]_[A-Za-z0-9]{20,}"  # GitHub PAT, OAuth, app, user, refresh
+    r"|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"  # GitHub PAT/OAuth/app/user/refresh + fine-grained
     r"|xox[baprs]-[A-Za-z0-9-]{10,}"  # Slack bot/user/app tokens
     r"|AKIA[0-9A-Z]{16}"  # AWS access key ID
     r"|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"  # JWT

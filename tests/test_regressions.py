@@ -712,6 +712,7 @@ TOKEN_FAMILIES = [
     ("github-app", "ghs_" + "a1B2c3D4" * 5),
     ("github-user", "ghu_" + "a1B2c3D4" * 5),
     ("github-refresh", "ghr_" + "a1B2c3D4" * 5),
+    ("github-fine-grained-pat", "github_pat_" + "a1B2c3D4_x7Y8z9" * 2),
     ("slack-bot", "xoxb-" + "123456789012-" * 2 + "a1B2c3D4e5F6"),
     ("slack-user", "xoxp-" + "123456789012-" * 2 + "a1B2c3D4e5F6"),
     ("aws-access-key", "AKIA" + "A1B2C3D4E5F6G7H8"),

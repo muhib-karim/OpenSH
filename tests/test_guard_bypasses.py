@@ -381,7 +381,37 @@ FLAGGED = {
         'cmd /c "r^d /s /q C:\\temp"',
         '“rm” -rf /',
     ],
+    # Bash ANSI-C quoting ($'...') is resolved by the shell before the command
+    # runs, so splitting a command name into adjacent $'...' chunks hides it from
+    # a guard that only sees the literal text. Single-token $'rm' is caught
+    # today; the split forms below are not.
+    'ANSI-C quoting ($\'...\')': [
+        "$'r'$'m' -rf /tmp/x",
+        "$'r'$'m' -r -f /tmp/x",
+        "$'r'$'m' -fr /tmp/x",
+        "$'r'$'m' -rf ~",
+        "$'r'$'m' -rf /",
+        "$'r'$'m' --recursive --force /x",
+        "sudo $'r'$'m' -rf /x",
+        "bash -c $'r'$'m' -rf /x'",
+        "sh -c $'r'$'m' -rf /x'",
+        "bash -c $'r'$'m' -r -f /tmp/x'",
+        # ANSI-C quoting also decodes \uHHHH escapes: no literal "rm" in either
+        # guard view unless the escape is flagged or decoded.
+        "$'\\u0072'$'\\u006d' -rf /tmp/x",
+        "r$'\\u006d' -rf /tmp/x",
+        "sudo $'\\u0072\\u006d' -rf /",
+    ],
 }
+
+# ANSI-C quoting is also a normal way to pass tabs and newlines to echo/printf.
+# The guard must not start prompting for these.
+ANSI_C_QUIET = [
+    "echo $'hello\\tworld'",
+    "printf $'a\\nb\\n'",
+    "cat $'notes.txt'",
+    "grep $'foo' file.txt",
+]
 
 # Commands people ask for all day. None of these may trigger a confirmation prompt.
 QUIET = [
@@ -509,10 +539,17 @@ def test_everyday_command_is_not_flagged(cmd):
     assert opsh.destructive_reason(cmd) is None
 
 
+@pytest.mark.parametrize("cmd", ANSI_C_QUIET)
+def test_ansi_c_quoting_alone_does_not_trigger_the_guard(cmd):
+    assert not opsh.is_destructive(cmd)
+    assert opsh.destructive_reason(cmd) is None
+
+
 def test_no_command_appears_twice():
     flagged = [cmd for cmds in FLAGGED.values() for cmd in cmds]
     assert len(flagged) == len(set(flagged))
     assert not set(flagged) & set(QUIET)
+    assert not set(flagged) & set(ANSI_C_QUIET)
 
 
 @pytest.mark.parametrize("cmd,reason", [

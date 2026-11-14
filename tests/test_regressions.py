@@ -702,6 +702,54 @@ def test_keys_in_command_output_are_not_sent_to_the_model():
     assert "[redacted]" in context and "cat .env" in context
 
 
+# Token shapes people actually paste into a terminal: `gh auth token`, `cat ~/.aws/credentials`,
+# `env | grep OPENAI`, a copied curl header. None of them match the gsk_/AIza/NAME=value rules.
+TOKEN_FAMILIES = [
+    ("openai", "sk-proj-" + "a1B2c3D4" * 6),
+    ("openai-short", "sk-" + "a1B2c3D4" * 6),
+    ("github-pat", "ghp_" + "a1B2c3D4" * 5),
+    ("github-oauth", "gho_" + "a1B2c3D4" * 5),
+    ("github-app", "ghs_" + "a1B2c3D4" * 5),
+    ("github-user", "ghu_" + "a1B2c3D4" * 5),
+    ("github-refresh", "ghr_" + "a1B2c3D4" * 5),
+    ("github-fine-grained-pat", "github_pat_" + "a1B2c3D4_x7Y8z9" * 2),
+    ("slack-bot", "xoxb-" + "123456789012-" * 2 + "a1B2c3D4e5F6"),
+    ("slack-user", "xoxp-" + "123456789012-" * 2 + "a1B2c3D4e5F6"),
+    ("aws-access-key", "AKIA" + "A1B2C3D4E5F6G7H8"),
+    ("jwt", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0." + "a1B2c3D4" * 6),
+    ("bearer-header", "Authorization: Bearer a1B2c3D4e5F6g7H8i9J0"),
+    ("bearer-bare", "Bearer a1B2c3D4e5F6g7H8i9J0k1L2"),
+]
+
+
+@pytest.mark.parametrize("family,token", TOKEN_FAMILIES, ids=[f for f, _ in TOKEN_FAMILIES])
+def test_every_common_token_shape_is_redacted(family, token):
+    assert token not in opsh.redact_secrets(f"here it is: {token}")
+    assert "[redacted]" in opsh.redact_secrets(token)
+
+
+@pytest.mark.parametrize("family,token", TOKEN_FAMILIES, ids=[f for f, _ in TOKEN_FAMILIES])
+def test_token_in_command_output_never_reaches_the_history(family, token):
+    opsh.add_to_history("gh auth token", token)
+    stored = opsh.command_history[0]
+    assert token not in stored["output"]
+    assert token not in opsh.format_history()
+
+
+def test_redaction_leaves_ordinary_words_alone():
+    for text in ["task-management-system-for-users", "risk-assessment-report.pdf",
+                 "the bearer of good news", "AKIA is a prefix", "cat notes.txt",
+                 "eyJhbGciOiJIUzI1NiJ9"]:
+        assert opsh.redact_secrets(text) == text
+
+
+def test_redaction_keeps_the_assignment_name_visible():
+    assert opsh.redact_secrets("OPENAI_API_KEY=sk-abc123") == "OPENAI_API_KEY=[redacted]"
+    assert opsh.redact_secrets("aws_secret_access_key = wJalrXUtnFEMI") == "aws_secret_access_key = [redacted]"
+    assert opsh.redact_secrets("gsk_" + "a1B2" * 10) == "[redacted]"
+    assert opsh.redact_secrets("AIza" + "x9Y8" * 9) == "[redacted]"
+
+
 def test_file_names_in_the_prompt_have_control_characters_escaped(monkeypatch, tmp_path):
     monkeypatch.setattr(opsh.os, "listdir", lambda folder: ["notes.txt", "bad\x1b[2Jname", "x" * 500])
     context = opsh.get_file_context(str(tmp_path))

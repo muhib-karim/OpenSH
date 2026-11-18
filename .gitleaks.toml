@@ -1,0 +1,12 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic token shapes in redaction regression tests"
+commits = [
+  "d566cae3715a136665072e5ae96a11300b653e54",
+  "44a7dcf0677e3971f9a2a50e04a943af27b7c51b",
+]
+paths = [
+  '''^tests/test_regressions\.py$''',
+]

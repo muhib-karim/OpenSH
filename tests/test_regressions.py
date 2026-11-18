@@ -363,6 +363,36 @@ def test_generated_command_is_shown_with_control_characters_escaped(monkeypatch,
     assert "\\x1b[2K\\x0dls" in shown and "\r" not in shown
 
 
+@pytest.mark.parametrize("hidden", ["\n", "\t", "\r", "\x00", "\x1b", "\x7f"])
+def test_printable_escapes_every_control_character(hidden):
+    """What is shown must stay on one line; a raw newline lets a second command print without an arrow."""
+    shown = opsh.printable(f"echo safe{hidden}rm notes.txt")
+    assert hidden not in shown
+    assert shown == "echo safe" + f"\\x{ord(hidden):02x}" + "rm notes.txt"
+
+
+def test_newline_cannot_hide_a_second_command_behind_the_arrow(monkeypatch, capsys):
+    """A model reply of `echo ok<newline>rm notes.txt` must not print as two clean lines."""
+    ran = _record_commands(monkeypatch)
+    opsh.handle_generated("echo ok\nrm notes.txt", assume_yes=True)
+    shown = capsys.readouterr().out
+
+    assert ran == ["echo ok\nrm notes.txt"]  # both still run, as one shell line
+    assert "\nrm notes.txt" not in shown  # the second command must not start its own line
+    assert shown.count("→") == 1  # exactly one arrow, covering the whole command
+    assert "\\x0arm notes.txt" in shown  # it is shown escaped, on the arrow's line
+
+
+def test_tab_cannot_pad_the_shown_command_to_look_like_output(monkeypatch, capsys):
+    ran = _record_commands(monkeypatch)
+    opsh.handle_generated("echo ok\trm notes.txt", assume_yes=True)
+    shown = capsys.readouterr().out
+
+    assert ran == ["echo ok\trm notes.txt"]
+    assert "\t" not in shown
+    assert "\\x09rm notes.txt" in shown
+
+
 # --- config and .env ---------------------------------------------------------------
 
 @pytest.mark.parametrize("content", ["", "{not json", "[1, 2]", "null", "\x00\x01"])

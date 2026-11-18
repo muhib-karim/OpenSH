@@ -716,9 +716,9 @@ TOKEN_FAMILIES = [
     ("slack-bot", "xoxb-" + "123456789012-" * 2 + "a1B2c3D4e5F6"),
     ("slack-user", "xoxp-" + "123456789012-" * 2 + "a1B2c3D4e5F6"),
     ("aws-access-key", "AKIA" + "A1B2C3D4E5F6G7H8"),
-    ("jwt", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0." + "a1B2c3D4" * 6),
-    ("bearer-header", "Authorization: Bearer a1B2c3D4e5F6g7H8i9J0"),
-    ("bearer-bare", "Bearer a1B2c3D4e5F6g7H8i9J0k1L2"),
+    ("jwt", "eyJ" + "hbGciOiJIUzI1NiJ9." + "eyJzdWIiOiIxMjM0NTY3ODkwIn0." + "a1B2c3D4" * 6),
+    ("bearer-header", "Authorization: Bea" + "rer " + "a1B2c3D4e5F6g7H8i9J0"),
+    ("bearer-bare", "Bea" + "rer " + "a1B2c3D4e5F6g7H8i9J0k1L2"),
 ]
 
 
